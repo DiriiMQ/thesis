@@ -1,0 +1,184 @@
+% Graduation Thesis Template - VNUHCM University of Science, Faculty of Information Technology
+% Advanced Program of Computer Science (APCS)
+%
+% Build order: BIB > PDF > PDF (build twice after the bibliography so cross-references resolve).
+% Clean all previously generated build files before rebuilding.
+
+\documentclass[oneside,a4paper,14pt]{extreport}
+
+% Vietnamese-capable fonts (kept so accented Vietnamese names/terms render correctly)
+\usepackage[T5]{fontenc}
+\usepackage[utf8]{inputenc}
+\DeclareTextSymbolDefault{\DH}{T1}
+
+% Bibliography
+\usepackage[style=ieee, defernumbers=true]{biblatex}
+\usepackage[unicode]{hyperref}
+\addbibresource{References/references.bib}
+
+\makeatletter
+\def\blx@maxline{77}
+\makeatother
+
+% Figures, kept under images/
+\usepackage{graphicx}
+\graphicspath{ {images/} }
+
+% Source code listings
+\usepackage{listings}
+\usepackage{color}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% Pseudocode
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+% Tables
+\usepackage{multirow}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+% Chapter heading size
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\LARGE\bfseries}
+  {\chaptertitlename\ \thechapter}{18pt}{\huge}
+
+% 1.5 line spacing (per FIT/HCMUS formatting regulation)
+\usepackage{setspace}
+\onehalfspacing
+
+\usepackage{indentfirst}
+
+% Margins per official FIT/HCMUS thesis formatting regulation:
+% top 3cm, bottom 3.5cm, left 3.5cm, right 2cm
+\usepackage[
+  top=30mm,
+  bottom=35mm,
+  left=35mm,
+  right=20mm,
+  includefoot]{geometry}
+
+% Cover page
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\newcommand\HRule{\rule{\textwidth}{1pt}}
+
+% ========================================================================================= %
+% Thesis / project metadata - update these to match the signed thesis proposal              %
+% ========================================================================================= %
+\newcommand{\authorNames}{Phan~Minh~Quang~-~Le~Duc~Phu}
+\newcommand{\studentIDs}{22125083~-~22125074}
+\newcommand{\thesisTitle}{Evaluating~LLM-based~Android~Malware~Detection}
+\newcommand{\advisorNames}{M.Sc.~Trần~Anh~Duy~-~Dr.~Lê~Kim~Hùng}
+\newcommand{\program}{Advanced Program of Computer Science}
+\newcommand{\faculty}{Faculty of Information Technology}
+
+\begin{document}
+
+\input{Title/title.tex}
+
+\cleardoublepage
+
+\pagenumbering{roman}
+
+\phantomsection
+\include{Appendix/commitment}
+
+\addcontentsline{toc}{chapter}{Revision Statement}
+\include{Appendix/edit}
+
+\addcontentsline{toc}{chapter}{Supervisor's Comments}
+\include{Appendix/advisor}
+
+\addcontentsline{toc}{chapter}{Reviewer's Comments}
+\include{Appendix/reviewer}
+
+\addcontentsline{toc}{chapter}{Acknowledgments}
+\include{Appendix/thanks}
+
+\addcontentsline{toc}{chapter}{Thesis Proposal}
+\include{Appendix/proposal}
+
+% Table of contents, list of figures, list of tables
+\addcontentsline{toc}{chapter}{Table of Contents}
+
+\tableofcontents
+
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listfigurename}
+\listoffigures
+
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listtablename}
+\listoftables
+
+\addcontentsline{toc}{chapter}{Abstract}
+\include{Appendix/summary}
+
+\clearpage
+
+\pagenumbering{arabic}
+
+% Main content chapters
+\include{Chapter1/chapter1}
+
+\include{Chapter2/chapter2}
+
+\include{Chapter3/chapter3}
+
+\include{Chapter4/chapter4}
+
+\include{Chapter5/chapter5}
+
+% Author's publications (comment out the two lines below if there are none)
+\addcontentsline{toc}{chapter}{List of Publications}
+\include{Appendix/publish}
+
+% References
+\addcontentsline{toc}{chapter}{References}
+\printbibheading[title={References}]
+
+\printbibliography[heading=subbibliography, title={Vietnamese}, keyword=Viet, resetnumbers=true]
+
+\DeclareNameAlias{sortname}{last-first}
+\DeclareNameAlias{default}{last-first}
+
+\printbibliography[heading=subbibliography, title={English}, notkeyword=Viet, resetnumbers=4]
+% ===================================================================== %
+% NOTE: set resetnumbers = (number of Vietnamese references) + 1        %
+% ===================================================================== %
+
+% Appendices
+\include{Appendix/appendix1}
+\include{Appendix/appendix2}
+
+\end{document}

@@ -1,0 +1,124 @@
+\chapter{LaTeX Formatting Reference}
+\label{Appendix2}
+
+This appendix collects short, working examples of the LaTeX constructs most
+commonly needed while writing the thesis. It is not part of the thesis
+narrative -- it is a quick reference for the authors while editing.
+
+\section{Citations}
+
+Use \verb|\cite| to cite one or more references. A reference can be a
+website~\cite{Listings,HDLVThS}, a conference paper~\cite{1994-Cavnar}, a
+book~\cite{1984-TeX-Knuth,2006-DDien,2006-NPTV}, or a journal
+article~\cite{1989-TED}. Write sentences so that they still read correctly
+if the bracketed citation were removed -- prefer ``Zhang and
+Shasha~\cite{1989-TED} show that ...'' over ``Research~\cite{1989-TED} shows
+that ...''.
+
+\section{Source Code}
+
+Source code listings use the \verb|listings| package~\cite{Listings}. Code
+can be inserted inline:
+
+\begin{lstlisting}[language=Python]
+print("Hello, World!")
+\end{lstlisting}
+
+or included from a file in \verb|SourceCode/|:
+
+\lstinputlisting[language=C++]{SourceCode/hello.cpp}
+
+Pseudocode uses the \verb|algorithm|/\verb|algpseudocode| packages:
+
+\begin{algorithm}
+\caption{Example algorithm}\label{euclid}
+\begin{algorithmic}[1]
+\Procedure{MyProcedure}{}
+\State $\textit{stringlen} \gets \text{length of }\textit{string}$
+\State $i \gets \textit{patlen}$
+\BState \emph{top}:
+\If {$i > \textit{stringlen}$} \Return false
+\EndIf
+\State $j \gets \textit{patlen}$
+\BState \emph{loop}:
+\If {$\textit{string}(i) = \textit{path}(j)$}
+\State $j \gets j-1$.
+\State $i \gets i-1$.
+\State \textbf{goto} \emph{loop}.
+\State \textbf{close};
+\EndIf
+\State $i \gets i+\max(\textit{delta}_1(\textit{string}(i)),\textit{delta}_2(j))$.
+\State \textbf{goto} \emph{top}.
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\section{Figures}
+
+Figures use the \verb|graphicx| package~\cite{Figures}. Figures
+\ref{fig:example1} and \ref{fig:example2} show examples.
+
+\begin{figure}[htp]
+\centering
+\includegraphics[width=9cm]{images/logo.png}
+\caption{Example figure 1}
+\label{fig:example1}
+\end{figure}
+
+\begin{figure*}[htp]
+\centering
+\includegraphics[width=60mm]{images/logo.png}
+\caption{Example figure 2}
+\label{fig:example2}
+\end{figure*}
+
+\section{Tables}
+
+See~\cite{Tables} for more table examples. Table~\ref{tab:example1} shows a
+sample table; \url{http://www.tablesgenerator.com/} can help build tables
+visually.
+
+\begin{table}[ht]
+\caption{Example table}
+\label{tab:example1}
+\begin{center}
+\begin{tabular}{ |p{3cm}||p{3cm}|p{3cm}|p{3cm}|  }
+ \hline
+ \multicolumn{4}{|c|}{Country List} \\
+ \hline
+ Country/Area Name & ISO ALPHA 2 & ISO ALPHA 3 & ISO Numeric \\
+ \hline
+ Afghanistan   & AF  & AFG & 004\\
+ Aland Islands & AX  & ALA & 248\\
+ Albania       & AL  & ALB & 008\\
+ Algeria       & DZ  & DZA & 012\\
+ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\section{Equations}
+
+An equation can appear inline, e.g. $\sqrt{a^2+b^2}$, or on its own line as
+in Equation~\ref{eu_eqn}.
+
+\begin{equation} \label{eu_eqn}
+x = a_0 + \frac{1}{a_1 + \frac{1}{a_2 + \frac{1}{a_3 + a_4}}}
+\end{equation}
+
+\section{General Formatting Rules (FIT/HCMUS)}
+
+\begin{itemize}
+\item Font: Times New Roman (Unicode), 13-14pt; 1.5 line spacing.
+\item Margins: top 3cm, bottom 3.5cm, left 3.5cm, right 2cm; page number
+centered at the bottom.
+\item Length: 50-100 pages of content (excluding cover, acknowledgments,
+table of contents, references, appendices).
+\item Number chapters/sections/subsections with Arabic numerals only
+(e.g.\ \texttt{3.1}, \texttt{3.1.1}), never Roman numerals.
+\item Figure/table/equation numbers are tied to the chapter number, e.g.\
+Figure 3.4 is the 4th figure in Chapter 3. Always cite the source of any
+figure/table taken from elsewhere.
+\item Avoid overusing abbreviations; list them alphabetically at the front of
+the thesis if there are many.
+\end{itemize}
