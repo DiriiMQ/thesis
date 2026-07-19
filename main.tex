@@ -1,19 +1,21 @@
 % Graduation Thesis Template - VNUHCM University of Science, Faculty of Information Technology
 % Advanced Program of Computer Science (APCS)
 %
-% Build order: BIB > PDF > PDF (build twice after the bibliography so cross-references resolve).
+% Compile with XeLaTeX (or LuaLaTeX), not pdflatex -- fontspec below requires it.
+% Build order: XeLaTeX > Biber > XeLaTeX > XeLaTeX.
 % Clean all previously generated build files before rebuilding.
 
 \documentclass[oneside,a4paper,14pt]{extreport}
 
-% Vietnamese-capable fonts (kept so accented Vietnamese names/terms render correctly)
-\usepackage[T5]{fontenc}
-\usepackage[utf8]{inputenc}
-\DeclareTextSymbolDefault{\DH}{T1}
+% Times New Roman per the FIT/HCMUS formatting regulation. TeX Gyre Termes is
+% a free, metric-compatible Times clone with full Vietnamese Unicode coverage,
+% used via fontspec (requires XeLaTeX/LuaLaTeX).
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Termes}
 
 % Bibliography
 \usepackage[style=ieee, defernumbers=true]{biblatex}
-\usepackage[unicode]{hyperref}
+\usepackage{hyperref}
 \addbibresource{References/references.bib}
 
 \makeatletter
@@ -140,6 +142,9 @@
 \cleardoublepage
 \addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\include{Appendix/abbreviations}
 
 \addcontentsline{toc}{chapter}{Abstract}
 \include{Appendix/summary}
