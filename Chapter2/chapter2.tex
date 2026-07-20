@@ -3,25 +3,85 @@
 
 \section{Android Malware Detection}
 
-\textit{[TODO: Introduce Android malware analysis concepts needed to follow
-the thesis -- static analysis, dynamic analysis, permissions, API calls,
-source/sink taint analysis, etc.]}
+Android malware detection has traditionally relied on static, dynamic, or
+hybrid analysis. Static analysis inspects an APK without executing it,
+extracting features such as requested permissions, API calls, opcode
+sequences, and call graphs; dynamic analysis instead runs the app in a
+sandbox and observes runtime behavior. Machine-learning and deep-learning
+classifiers built on these features have dominated the field for the past
+decade~\cite{xu2019droidevolver,kim2019multimodal,cai2021jowmdroid,liu2024unraveling}.
+Two persistent weaknesses motivate the shift toward LLM-based approaches
+studied in this thesis. First, such classifiers are prone to concept drift:
+performance degrades as malware evolves away from the training
+distribution~\cite{barbero2022transcending,pendlebury2019tesseract}.
+Second, they typically operate as opaque classifiers, offering little in
+the way of human-readable justification for a
+verdict~\cite{Li2024-wl}. LLM-based methods, including the LAMD framework
+this thesis builds on, aim to address both weaknesses at once: broad
+pre-trained knowledge for better generalization under drift, and natural
+language reasoning for explainable output.
 
 \section{The LAMD Framework}
 
-\textit{[TODO: Describe the LAMD framework that one of the evaluated methods
-builds on -- its pipeline, inputs/outputs, and why it was chosen as a
-baseline/building block.]}
+LAMD~\cite{Qian2025-ua} is the framework the thesis's first implemented
+candidate method builds on. It combines two components. \emph{Key-context
+extraction} seeds analysis from suspicious API calls -- data-access APIs
+such as \texttt{getPrimaryClip()} and data-transmission (sink) APIs -- and
+retains only the code that is control- or data-dependent on those calls via
+backward program slicing, so the LLM never has to reason over an entire
+decompiled application. \emph{Tier-wise code reasoning} then builds an
+understanding of each sliced fragment bottom-up in three passes: a Tier-1
+pass summarizes each function's behavior; a Factual Consistency
+Verification (FCV) step checks that a summary's claimed dependencies are
+actually present in the code (a Data Relationship Coverage score,
+thresholded at $\theta = 0.95$ in the original paper) before the summary is
+trusted; a Tier-2 pass aggregates function summaries into per-API intent;
+and a Tier-3 pass produces the final APK-level verdict together with
+supporting evidence.
+
+LAMD was selected as a building block for two reasons directly relevant to
+the evaluation goals of this thesis. It targets the same two structural
+problems that make naive "feed the whole APK to an LLM" approaches
+impractical -- context-window limits and the poor fit between
+sequential token-based reasoning and Android's deeply nested call
+structure -- and its own evaluation reports better robustness to temporal
+distribution drift than the traditional baselines it compares against (see
+Chapter~\ref{Chapter3}, RQ2, for the literature's account of this result).
+Chapter~\ref{Chapter4} describes how this thesis reimplements LAMD as a
+baseline and iterates on it.
 
 \section{Large Language Models for Security Tasks}
 
-\textit{[TODO: Background on LLMs and how they have been applied to security
-and code-analysis tasks in general, before narrowing to malware detection.]}
+Large Language Models have been applied to security tasks more broadly than
+malware detection alone. General-purpose LLMs and code-specialized variants
+built on the Transformer architecture~\cite{brown2020gpt3} have been shown
+to analyze code structure, summarize behavior, and reason about intent
+without task-specific training. Existing surveys catalog this broader
+application space -- code analysis, vulnerability and threat identification,
+and disguised or obfuscated malware
+detection~\cite{alkaraki2024exploring,guo2025} -- across security domains
+in general, not Android specifically. This thesis narrows that broad
+capability to one platform and one task: Android malware detection.
+Chapter~\ref{Chapter3} reports a systematic literature review focused
+specifically on that intersection.
 
 \section{Related Work}
 
-\textit{[TODO: Summarize the systematic literature review (SLR) findings on
-LLM-based Android malware detection approaches. Organize by approach family
-(e.g. prompting-based, fine-tuned, agentic/tool-augmented). For each family,
-state what problem it solves, its limitations, and how this thesis'
-evaluation framework addresses gaps left by prior work.]}
+This section covers related work on Android malware detection prior to and
+outside the LLM-based literature; LLM-based approaches specifically are
+surveyed through a dedicated systematic literature review in
+Chapter~\ref{Chapter3}, which also positions this thesis against existing
+secondary studies (Chapter~\ref{Chapter3}, Section~\ref{sec:relwork}).
+
+Traditional Android malware detection is a mature research area. Static
+feature-based classifiers such as Drebin and graph-based approaches such as
+Malscan established the feature families (permissions, API calls, call-graph
+centrality) that later work, including LAMD's own baselines, still compares
+against. Two lines of criticism from this literature motivate the
+LLM-based direction evaluated in this thesis: robustness to concept drift is
+consistently reported as a weak point of purely learning-based
+classifiers~\cite{barbero2022transcending,pendlebury2019tesseract}, and
+opaque, non-explainable verdicts limit how much a security analyst can
+trust or act on a classifier's output~\cite{Li2024-wl}. Both concerns
+recur throughout the LLM-based literature reviewed in Chapter~\ref{Chapter3}
+and directly shape the evaluation criteria used in Chapter~\ref{Chapter4}.

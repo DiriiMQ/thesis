@@ -3,10 +3,19 @@
 
 \section{Overview}
 
-\textit{[TODO: Give a high-level overview of the evaluation framework used to
-compare LLM-based Android malware detection methods, including the candidate
-methods selected (one of which builds on the LAMD framework) and how they are
-compared fairly.]}
+This thesis evaluates LLM-based Android malware detection methods under a
+common framework: the same dataset(s), the same metrics
+(Section~\ref{sec:metrics}), and a comparable evaluation protocol across
+candidates, so that differences in reported performance reflect the method
+rather than the evaluation setup. As of this writing, one candidate has a
+working implementation: the LAMD-based method described in
+Section~\ref{sec:lamd-candidate}, built on the LAMD framework introduced in
+Chapter~\ref{Chapter2}. Additional candidates, drawn from the taxonomy of
+LLM-based approaches identified in the Chapter~\ref{Chapter3} systematic
+literature review (e.g. the RAG-based and fine-tuning-based families in
+RQ1), are targeted for future integration into the same framework rather
+than already implemented; this chapter is scoped to what has been built so
+far and states explicitly where a candidate is still pending.
 
 \section{Candidate Methods}
 
@@ -197,19 +206,39 @@ verdict.}
 
 \section{Datasets}
 
-\textit{[TODO: Describe the dataset(s) of benign and malicious APKs used,
-how they were collected/labeled, and any preprocessing performed.]}
+Development and debugging of the LAMD-based candidate used a small,
+purpose-built sample of 12 APKs downloaded live via the AndroZoo API: 7
+malware samples (\texttt{vt\_detection} $\geq 15$) and 5 benign samples
+(\texttt{vt\_detection} $= 0$, sourced from the Google Play market), each
+between 200KB and 1.3MB to keep pipeline runtime tractable during
+iteration. This set is a development/debugging sample used to validate and
+compare pipeline behavior across design changes (Chapter~\ref{Chapter5}); it
+is distinct from the original LAMD paper's own evaluation set, which spans
+13,794 AndroZoo samples labeled through VirusTotal ($>4$ engine detections)
+across three temporally ordered test periods (2020--2023) to measure
+robustness to distribution drift~\cite{Qian2025-ua}. A larger-scale
+evaluation dataset for the final cross-candidate comparison has not yet
+been finalized.
 
-\section{Evaluation Metrics}
+\section{Evaluation Metrics}\label{sec:metrics}
 
-\textit{[TODO: Define the metrics used to compare methods, e.g. accuracy,
-precision, recall, F1-score, false positive/negative rates, and runtime
-cost.]}
+Detection quality is measured with Accuracy, Precision, Recall, and
+F1-score, plus False Positive Rate (FPR) and False Negative Rate (FNR) to
+separate the two error modes given the class imbalance typical of malware
+datasets. Efficiency is measured separately via LLM call count, token usage,
+wall-clock runtime per APK, and cost per APK in USD, since LLM-based methods
+trade detection quality against non-trivial inference cost
+(Chapter~\ref{Chapter3}, RQ2).
 
 \section{Experimental Setup}
 
-\textit{[TODO: Describe the environment, tools, prompts or configurations,
-and procedure used to run each candidate method.]}
+\textit{[TODO: Describe prompts/configurations and the procedure used to run
+each candidate method once additional candidates are integrated.]}
+
+The LAMD-based candidate is implemented in Python, using androguard for
+static analysis and backward slicing, and a persistent semantic cache
+(ChromaDB with its default ONNX embedding model) for the CFG-level cache
+described in Section~\ref{sec:lamd-candidate}.
 
 \textbf{LLM backend note.} The LAMD paper's own experiments use
 GPT-4o-mini~\cite{Qian2025-ua}. For this thesis, all LAMD-based candidate
