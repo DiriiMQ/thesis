@@ -10,9 +10,190 @@ compared fairly.]}
 
 \section{Candidate Methods}
 
-\textit{[TODO: Describe each candidate method under evaluation: how it works,
-what inputs it requires, and any modifications made to integrate it into a
-common evaluation pipeline.]}
+\textit{[TODO: Introduce the full set of candidate methods evaluated in this
+thesis and how each was integrated into a common evaluation pipeline. One
+candidate builds directly on the LAMD framework~\cite{Qian2025-ua}; its
+development is detailed in Section~\ref{sec:lamd-candidate} below. Other
+candidates (e.g. representative RAG- or fine-tuning-based systems from the
+Chapter~\ref{Chapter3} taxonomy) should be described in their own subsections
+here.]}
+
+\subsection{Development of the LAMD-based Candidate}\label{sec:lamd-candidate}
+
+This section reports the iterative engineering process behind the LAMD-based
+candidate method, from a faithful baseline reimplementation through three
+independent optimization attempts to the design currently used for
+evaluation. Consistent with the methodology-focused scope of this chapter,
+the discussion below concerns design rationale only; the corresponding
+accuracy, cost, and latency measurements are reported in
+Chapter~\ref{Chapter5}.
+
+\subsubsection{Baseline: A Faithful LAMD Reimplementation}
+
+No official implementation of LAMD~\cite{Qian2025-ua} is publicly available,
+so a baseline was reconstructed directly from the paper's description of its
+two-component design: \emph{key-context extraction}, which seeds analysis
+from suspicious API calls and retains only the control- and data-dependent
+code around them via backward program slicing, and \emph{tier-wise code
+reasoning}, three LLM passes that build understanding bottom-up from
+individual function summaries (Tier 1) to per-API intent (Tier 2) to a final
+APK-level verdict (Tier 3), gated by a Factual Consistency Verification (FCV)
+step between Tier 1 and Tier 2 that rejects function summaries whose Data
+Relationship Coverage falls below the paper's threshold ($\theta = 0.95$).
+This reimplementation is treated as the control condition throughout: every
+sliced control-flow graph (CFG) is passed through all three tiers with no
+caching and no early exit, exactly mirroring the paper's design without any
+of the optimizations described below.
+
+\subsubsection{Iterative Optimization Attempts}
+
+Three independent directions were explored on top of the baseline, each
+targeting the same underlying problem: every sliced CFG pays the full
+Tier~1 + FCV + Tier~2 + Tier~3 cost regardless of how obvious the eventual
+verdict is.
+
+\textbf{Paper-fidelity corrections.} Before optimizing, two gaps against the
+paper's own design were closed. First, the backward-slicing procedure now
+recursively resolves parameters into caller methods when a variable is not
+already defined within the current function, matching the paper's
+requirement to recurse into callers until all variables are resolved.
+Second, the FCV system prompt was corrected to reference the function under
+verification explicitly, as the paper's own prompt specifies. These fixes
+improve fidelity to the published method but do not by themselves change
+cost or accuracy; they establish a more trustworthy baseline for the
+optimizations that follow.
+
+\textbf{Role-based early exit.} The first optimization classifies every
+Tier-1 function summary with an additional \emph{role} label -- SOURCE,
+SINK, BOTH, or NEUTRAL -- describing whether the function's suspicious API
+usage looks like a data-collection point, a data-transmission point, both,
+or neither. If every sliced CFG in an APK is classified NEUTRAL, the pipeline
+exits early with a BENIGN verdict, skipping Tier~2 and Tier~3 entirely; if a
+SOURCE-labeled CFG and a SINK-labeled CFG are both observed anywhere in the
+APK, the pipeline exits early with a MALWARE verdict. This is a deliberately
+minimal test of whether role-based shortcutting can reduce cost without
+changing the verdict on clear-cut cases. It also has an obvious weakness:
+a SOURCE and a SINK appearing \emph{anywhere} in the same APK are treated as
+equally strong evidence regardless of whether they are actually related,
+which risks a false positive whenever an application happens to contain two
+unrelated suspicious-looking functions. This weakness directly motivated the
+connection-verification design described next.
+
+\textbf{Semantic caching with verified SOURCE/SINK connections.} The current
+candidate design (Figure~\ref{fig:lamd-cache-pipeline}) keeps the role
+classification idea but replaces the "any pair, anywhere" rule with an
+explicit connection check, and adds a semantic cache to avoid repeating
+Tier~1 and FCV work on near-duplicate code. A persistent cache stores each
+CFG's verified Tier-1 summary alongside an embedding of the CFG text itself;
+a new CFG whose embedding is sufficiently similar (cosine similarity
+$\geq 0.88$) to a cached entry reuses the stored, already-verified summary
+instead of issuing new Tier-1 and FCV calls. Once a SOURCE-labeled and a
+SINK-labeled CFG have both been observed, the pipeline checks whether they
+are actually connected before treating the pair as evidence, at one of three
+escalating levels: (1) the two calls occur in the same method, which is
+treated as strong structural evidence on its own, since the sink's backward
+slice already includes the source's data path; (2) the two calls occur in
+the same class, which is treated as suggestive but not conclusive on its
+own; or (3) the two calls are reachable from one another in the
+application's call graph within a bounded search radius. Levels 2 and 3
+are additionally confirmed or rejected by a dedicated LLM verification call
+before the pair is accepted as evidence; only level 1 is accepted without
+further verification, since it is the only level with a structural
+guarantee of a shared data path. If no connection is found, the candidate
+pair is discarded and scanning continues rather than concluding MALWARE
+prematurely.
+
+This design was arrived at through repeated testing rather than settled in
+advance. Two concrete refinements illustrate why the verification step
+exists at all. First, an early version of the design treated same-class
+co-location (level 2) as conclusive on its own, without the LLM verification
+step -- on the reasoning that two suspicious methods sharing a class
+plausibly share state. Testing against real-world samples showed this
+assumption does not hold: two unrelated methods can share a utility class
+with no data-flow relationship between them, and a same-class pair was
+observed to trigger an early, incorrect benign classification before the
+scan reached the application's actual malicious evidence. The design was
+corrected so that level 2 requires the same LLM verification as level 3;
+only level 1 retains its structural guarantee. Second, the suspicious-API
+list used for key-context extraction was found to omit a legacy HTTP client
+transmission API, which caused a small downloader-style sample to be
+under-evidenced and misclassified; the API list was subsequently extended
+with class-qualified matching so that the added API is recognized without
+colliding with an unrelated, commonly used API of the same method name
+elsewhere in the Android SDK. Both corrections are reported here as design
+motivation; their measured effect on classification outcomes is reported in
+Chapter~\ref{Chapter5}.
+
+\textbf{Retrieval-augmented grounding (parallel exploration).} A fourth,
+orthogonal direction grounds Tier~1 and Tier~3 prompts in a small,
+hand-curated knowledge base of malware-relevant APIs and composite malware
+profiles, retrieved via simple lexical (Jaccard) similarity rather than an
+embedding-based retriever. Unlike the three optimizations above, this
+direction does not aim to reduce cost; in preliminary testing it increased
+both the number of sliced CFGs examined and the number of LLM calls issued,
+while producing more concise and structured findings in the final report.
+It is treated as a separate, not-yet-integrated exploration of explanation
+quality rather than a candidate for the main cost/accuracy comparison in
+Chapter~\ref{Chapter5}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=7mm and 10mm,
+  every node/.style={font=\footnotesize},
+  startstop/.style={rectangle, rounded corners, draw, fill=gray!10, minimum width=32mm, minimum height=7mm, align=center},
+  process/.style={rectangle, draw, fill=blue!6, minimum width=32mm, minimum height=8mm, align=center},
+  decision/.style={diamond, draw, fill=orange!8, aspect=2.2, inner sep=1pt, align=center},
+  arr/.style={-{Latex[length=2mm]}}
+]
+  \node[startstop] (start) {For each sliced CFG,\\in order};
+  \node[decision, below=of start] (cachehit) {Cache hit?\\($\geq 0.88$ sim.)};
+  \node[process, left=14mm of cachehit, yshift=-9mm] (reuse) {Reuse cached\\summary (0 calls)};
+  \node[process, right=14mm of cachehit, yshift=-9mm] (tier1) {Tier 1: summarize\\+ classify role};
+  \node[process, below=of tier1] (fcv) {FCV: revise if\\DRC $< 0.95$};
+  \node[process, below=13mm of cachehit] (role) {Track role: SOURCE /\\SINK / BOTH / NEUTRAL};
+  \node[decision, below=of role] (pair) {Have a SOURCE\\\emph{and} a SINK item?};
+  \node[process, left=20mm of pair] (next) {Next CFG};
+  \node[decision, below=of pair] (conn) {Connection check\\(Level 1 / 2 / 3)};
+  \node[process, below=9mm of conn] (verify) {Level 2/3: LLM verify\\CONFIRMED / BENIGN};
+  \node[process, left=14mm of verify] (reset) {Reset pair,\\keep scanning};
+  \node[process, right=16mm of verify, yshift=6mm] (strong) {Strong evidence\\-- break loop};
+  \node[decision, below=14mm of verify] (allneutral) {All roles\\NEUTRAL?};
+  \node[startstop, below left=10mm and -8mm of allneutral] (benign) {early\_neutral:\\BENIGN};
+  \node[process, below right=10mm and -8mm of allneutral] (tier23) {Tier 2 + Tier 3 on\\non-NEUTRAL CFGs};
+  \node[startstop, below=9mm of allneutral, yshift=-14mm] (final) {Final verdict};
+
+  \draw[arr] (start) -- (cachehit);
+  \draw[arr] (cachehit) -- node[above,xshift=-2mm]{yes} (reuse);
+  \draw[arr] (cachehit) -- node[above,xshift=2mm]{no} (tier1);
+  \draw[arr] (tier1) -- (fcv);
+  \draw[arr] (fcv.south) .. controls +(0,-6mm) and +(18mm,6mm) .. (role.east);
+  \draw[arr] (reuse.south) .. controls +(0,-6mm) and +(-18mm,6mm) .. (role.west);
+  \draw[arr] (role) -- (pair);
+  \draw[arr] (pair) -- node[above]{no} (next);
+  \draw[arr] (next.north) .. controls +(0,20mm) and +(-30mm,0) .. (cachehit.west);
+  \draw[arr] (pair) -- node[right]{yes} (conn);
+  \draw[arr] (conn) -| node[near start, above]{none} (reset.north);
+  \draw[arr] (conn) -- node[right]{Level 2/3} (verify);
+  \draw[arr] (conn) -| node[near start, above]{Level 1} (strong.north);
+  \draw[arr] (verify) -- node[pos=0.3, above, fill=white, inner sep=1pt]{CONFIRMED} (strong.south);
+  \draw[arr] (verify) -- node[above]{BENIGN} (reset);
+  \draw[arr] (reset.west) .. controls +(-10mm,0) and +(-10mm,0) .. (next.south);
+  \draw[arr] (strong.south) |- (allneutral.east);
+  \draw[arr] (verify.south) |- ++(0,-8mm) -| (allneutral);
+  \draw[arr] (allneutral) -- node[above,xshift=-2mm]{yes} (benign);
+  \draw[arr] (allneutral) -- node[above,xshift=2mm]{no} (tier23);
+  \draw[arr] (benign.south) .. controls +(0,-6mm) and +(-14mm,6mm) .. (final.west);
+  \draw[arr] (tier23.south) .. controls +(0,-6mm) and +(14mm,6mm) .. (final.east);
+\end{tikzpicture}
+\caption{End-to-end flow of the current LAMD-based candidate
+(cache-and-verified-connection design). Each sliced CFG either hits the
+semantic cache or goes through Tier~1 and FCV; once a SOURCE and a SINK item
+have both been seen, a three-level connection check decides whether to treat
+them as evidence before the pipeline falls through to Tier~2/3 or an early
+verdict.}
+\label{fig:lamd-cache-pipeline}
+\end{figure}
 
 \section{Datasets}
 
@@ -27,5 +208,17 @@ cost.]}
 
 \section{Experimental Setup}
 
-\textit{[TODO: Describe the environment, tools, LLM models/versions, prompts
-or configurations, and procedure used to run each candidate method.]}
+\textit{[TODO: Describe the environment, tools, prompts or configurations,
+and procedure used to run each candidate method.]}
+
+\textbf{LLM backend note.} The LAMD paper's own experiments use
+GPT-4o-mini~\cite{Qian2025-ua}. For this thesis, all LAMD-based candidate
+runs instead use a different backend model, accessed through a CLI-driven
+subprocess call rather than a directly billed API, after the originally
+planned API-based backend became impractical to sustain during development.
+This substitution should be read as a methodology caveat: results produced
+in Chapter~\ref{Chapter5} are not directly comparable to the original
+paper's published figures on model choice alone. It is, however, consistent
+with the original paper's own discussion of API cost as a practical
+deployment constraint and its suggestion that cheaper or locally hosted
+models are a natural next step.
