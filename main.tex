@@ -64,6 +64,17 @@
 % Tables
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+% Math symbols (e.g. \checkmark used in the SLR comparison tables)
+\usepackage{amssymb}
+
+% Coloured "Key Takeaways" callout boxes used in the SLR chapter
+\usepackage{tcolorbox}
+
+% Keep wide floats from drifting past their section (used by the SLR tables)
+\usepackage[section]{placeins}
 \newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
 \newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
 \newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
@@ -163,6 +174,8 @@
 \include{Chapter4/chapter4}
 
 \include{Chapter5/chapter5}
+
+\include{Chapter6/chapter6}
 
 % Author's publications (comment out the two lines below if there are none)
 \addcontentsline{toc}{chapter}{List of Publications}

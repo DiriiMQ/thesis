@@ -1,0 +1,130 @@
+\section{RQ1: What LLM-based techniques have been proposed
+for Android malware detection?}\label{sec:rq1}
+
+\subsection{Background: Android Malware and Its Detection}
+
+Android malware refers to applications that carry out harmful actions on a device, such as stealing personal data, intercepting credentials, sending premium-rate messages, displaying fraudulent payment screens, or covertly tracking the user. Such applications reach devices through app marketplaces or sideloading and frequently disguise their malicious logic inside otherwise functional apps. An Android application is distributed as an APK package that contains a manifest (declaring permissions and components), compiled DEX bytecode, resources, and native libraries; these artifacts are the raw material that any detector inspects.
+
+Detection techniques are conventionally grouped into static, dynamic, and hybrid analysis. Static analysis inspects the APK without executing it, extracting features such as requested permissions, API calls, opcode sequences, and call graphs. Dynamic analysis runs the app in a sandbox and observes behavior such as system calls and network traffic, while hybrid analysis combines both. Over the past decade, machine-learning and deep-learning classifiers built on these features have become the dominant approach. The studies reviewed in this section build on the static branch of this tradition but replace, or augment, the conventional classifier with an LLM. The remainder of this subsection groups the reviewed work by the role the LLM plays in the pipeline.
+
+\subsection{Overview of Strategies}
+
+Based on the studies reviewed, LLM-based Android malware detection approaches generally follow three strategies, distinguished by the role the LLM plays:
+
+\begin{itemize}
+    \item \textit{Retrieval-Augmented Generation} -- the LLM filters and retrieves the relevant parts of an application, for example by removing unreachable paths, summarizing methods for indexing, or re-ranking retrieved snippets to reduce noise before analysis.
+    \item \textit{Semantic Representation} -- the LLM turns raw features into structured abstractions, such as per-feature notes, hierarchical summaries from functions to packages, or embeddings attached to graph nodes, so that later stages can reason over a cleaner view.
+    \item \textit{Fine-tuning and Direct Classification} -- the model is adapted to the detection task through training, either by fine-tuning an LLM on unified textual inputs (e.g., LoRA) or by training a dedicated classifier on LLM-derived representations, so that it emits the verdict directly.
+\end{itemize}
+
+Figure~\ref{fig:group1_arch} shows how the three strategies share a common context-construction stage, which decompiles the APK and prepares embeddings and code descriptions, and then diverge in how the LLM is used to reach a verdict. These strategies also overlap in practice: many systems combine LLM-driven context curation, semantic transformation, and a trained classifier. The following subsections describe representative approaches within each strategy.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{rq1_diagram_v5.png}
+    \caption{General architecture of the reviewed LLM-based Android malware detection pipelines.}
+    \label{fig:group1_arch}
+\end{figure}
+
+\subsection{Retrieval-Augmented Generation}
+
+Approaches in this category adopt Retrieval-Augmented Generation (RAG)~\cite{Lewis2020-rag}, which augments model inference by retrieving relevant external context at query time instead of relying only on parametric knowledge. For Android malware detection, this means selecting, filtering, and organizing the relevant code and features before reasoning or classification. The shared aim is to reduce the complexity of an application, which often contains large amounts of irrelevant or obfuscated code, by pruning dead paths, summarizing methods, or re-ranking retrieved snippets. Directing the LLM's attention to the most informative parts of the app improves both efficiency and interpretability. The resulting pipelines pair RAG with static program analysis and keep context preparation separate from decision-making, so later stages operate on cleaner, more focused representations.
+
+TraceRAG~\cite{Zhang2025-ot} and AgenticRAG~\cite{S2025-kj} are two examples that emphasize retrieval and explainable analysis. TraceRAG organizes its pipeline as a set of named LLM-driven modules. An \emph{LLM-Describer} produces method-level summaries that are indexed into a vector store, and an \emph{LLM-Cleanser} prunes dead or unreachable code to reduce obfuscation noise. Retrieval runs in two steps: top-$k$ similarity search, followed by an \emph{LLM Relevance-Reviewer} that keeps only the snippets aligned with the suspected behavior. An \emph{LLM-Analyzer} then reasons over the retrieved code in a depth-first, multi-turn manner, asking follow-up questions to reconstruct execution chains that may involve dynamic loading, reflection, or callbacks. Finally, an \emph{LLM-Organizer} compiles a report that cites concrete code locations and call chains, yielding traceable findings.
+
+AgenticRAG takes a feature-driven route. It starts from static features such as permissions, intents, receivers, and services, and has an LLM write a functional description of each. These descriptions are retrieved with an ensemble retriever that combines FAISS~\cite{faiss_lib} and BM25~\cite{Robertson2009} through Reciprocal Rank Fusion, using exact matching first and then fuzzy (Levenshtein) matching to tolerate partial or misspelled names. The retrieved descriptions are classified by domain-specific transformers, namely CySecBERT~\cite{Bayer2024} and SecBERT~\cite{Huang2024}, while a lightweight cache supports modular workflows and a Gemini Fusion model serves as a baseline. Both systems stress interpretability and coverage, but their quality depends on retrieval choices (indexing granularity and prompt alignment) and on the cost of multi-turn reasoning.
+
+\subsection{Semantic Representation}
+Approaches in this category transform raw code and features into structured, high-level representations that are easier for an LLM to reason over. The aim is to capture the semantic essence of an application, such as function behaviors, API usage patterns, or hierarchical program structure, while discarding irrelevant low-level detail. Per-feature notes, hierarchical summaries, or node embeddings let the LLM reason over complex apps in a scalable, systematic way. Such representations also help maintain context across large codebases and support modular, multi-level analysis.
+
+AppPoet~\cite{Zhao2024-dw} pairs prompted semantic views with a lightweight classifier. Static features are organized into three views, Permission, API, and URL/uses-feature, so the LLM reasons within coherent contexts. For each view, the LLM uses chain-of-thought prompting to generate per-feature function notes and a view-level summary. These texts are embedded (e.g., with text-embedding-ada-002), concatenated, and passed to a compact MLP that produces the binary verdict, and the LLM also drafts a human-readable diagnostic report. The design is modular and data-efficient because it decouples expensive LLM reasoning from the final decision. Its performance, however, is sensitive to how the views are defined and to the prompt and embedding choices, and care is needed to avoid leakage or redundancy across views.
+
+LAMD~\cite{Qian2025-ua} guides the LLM with program analysis and tiered reasoning. Starting from suspicious APIs as seeds, it applies backward slicing over control and data dependencies to keep only the instructions that influence those API calls, which refines the control-flow graph and removes noise. Reasoning then proceeds in three tiers: function-behavior summaries, API-intent awareness built from call graphs and function summaries, and a final APK verdict (MALWARE or BENIGN) with indicators of compromise. A Data Relationship Coverage check verifies factual consistency at the function tier before higher-level reasoning continues, which curbs hallucination. Explanations stay concise and verifiable, but the static-analysis overhead can be non-trivial and slicing may miss behavior outside the analyzed regions, such as dynamically loaded or native code.
+
+\subsection{Fine-tuning and Direct Classification}
+
+Approaches in this category focus on producing the detection verdict directly, by adapting the model to the task through training rather than by extensive context curation or summarization. Two variants appear in the reviewed work: fine-tuning an LLM on unified textual inputs, and training a dedicated classifier on representations derived from a code model. Either way, the emphasis is on the decision stage, aiming for high accuracy and efficiency on large-scale apps.
+
+LLM-MalDetect~\cite{Feng2025-ry} fine-tunes a compact backbone on a single unified text input. It merges permissions, API calls, and LLM-processed strings extracted from resources, XML, and assets into one structured text, and adapts a Mistral-7B model with LoRA under structured prompts. Accuracy is strong even with limited data, helped by richer string-level semantics and targeted adaptation. The trade-off is that its explanations are less directly tied to source code than in RAG-style systems, and fine-tuning adds training cost and data-handling overhead.
+
+Structural-Semantic~\cite{Khan2024-hy} fuses program structure with source-level content semantics drawn from a pre-trained code model. It extracts the app's call graph and attaches to each node an embedding (e.g., from CodeBERT or LLM-derived vectors) that captures source-level information, then classifies the resulting attributed graph with graph convolutional networks. This hybrid view improves robustness to textual noise and captures relational context that pure text misses. However, graph extraction can be brittle under heavy obfuscation or reflection, dynamic edges may be under-modeled, and very large graphs strain scalability and interpretability.
+
+\subsection{Summary of Reviewed Approaches}
+
+Across the three strategies, a common principle emerges: raw Android artifacts such as Smali code, permission lists, and call graphs are too voluminous and noisy for direct LLM consumption, so each approach inserts some preprocessing, abstraction, or selective retrieval between the artifact and the model. The boundaries between strategies are permeable. RAG systems such as TraceRAG and AgenticRAG use semantic summarization inside their retrieval pipelines, and Semantic Representation systems such as LAMD use program-analysis scaffolding that resembles context curation. Fine-tuning and direct-classification models, in turn, depend on the quality of upstream representations, whether graph embeddings or unified text. This interdependence reflects a broader point: LLM-based malware detection is a compositional problem, and the reliability of each component shapes the reliability of the whole. Despite the variety of strategies, all six systems rely predominantly on static analysis, and detecting dynamically loaded, reflectively invoked, or native code remains a challenge that no current approach fully resolves.
+
+To organize the reviewed work along comparable dimensions, we map the six systems onto a summary table, shown in Table~\ref{tab:rq1_summary}. The table classifies each system by feature type and APK source, feature representation (vector, graph, or text), the context-reduction or feature-selection strategy, the LLM's role in the pipeline (the three strategies defined above), the LLM backbone, the deployment context, and explainability support. Reading the studies along these axes makes their design choices directly comparable and exposes where the field clusters. The clearest such cluster is feature type: all six systems rely exclusively on \textit{static} analysis. This shared choice leaves dynamic behavior, including network traffic, runtime system calls, and dynamically loaded code, as an open gap across the corpus, consistent with the challenges identified by Guerra-Manzanares~\cite{GuerraManzanares2024}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Summary of reviewed LLM-based Android malware detection approaches}
+\label{tab:rq1_summary}
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{1.6\textwidth}{>{\raggedright\arraybackslash}X X X X X X X X}
+\toprule
+Study & Feature Type & Representation & Feature Selection & LLM Strategy & Backbone & Deployment & Explainability \\
+\midrule
+TraceRAG~\cite{Zhang2025-ot}
+  & Code (methods, DEX)
+  & Text summary $\to$ dense vector
+  & LLM dead-code pruning
+  & RAG
+  & o3-mini
+  & Cloud
+  & Yes \\
+AgenticRAG~\cite{S2025-kj}
+  & Permissions, intents (Manifest)
+  & Text $\to$ sparse+dense (FAISS+BM25)
+  & Rank fusion + fuzzy match
+  & RAG
+  & Gemini Flash
+  & Cloud
+  & Partial \\
+AppPoet~\cite{Zhao2024-dw}
+  & Permissions, APIs, URLs (Manifest+DEX)
+  & Text views $\to$ dense vector
+  & Manual (3 views)
+  & Semantic Repr.
+  & GPT-4
+  & Cloud
+  & Yes \\
+LAMD~\cite{Qian2025-ua}
+  & API calls + sliced CFG (DEX)
+  & Tiered text (func.\,$\to$\,APK)
+  & Backward program slicing
+  & Semantic Repr.
+  & GPT-4o-mini
+  & Cloud
+  & Yes \\
+LLM-MalDetect~\cite{Feng2025-ry}
+  & Permissions, APIs, strings (Manifest+DEX+Res.)
+  & Unified text (structured)
+  & LLM-assisted
+  & Fine-tuning / Classif.
+  & Mistral-7B (LoRA)
+  & On-device
+  & Partial \\
+Structural-Semantic~\cite{Khan2024-hy}
+  & Call graph (DEX)
+  & Graph + node embeddings
+  & Graph construction
+  & Fine-tuning / Classif.
+  & CodeBERT
+  & Local
+  & No \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+\begin{tcolorbox}[
+    title=\textbf{RQ1 -- Key Takeaways},
+    colback=white,
+    colframe=blue!60!black,
+    colbacktitle=blue!60!black,
+    fonttitle=\bfseries\color{white},
+    boxrule=0.5pt
+]
+The reviewed work answers RQ1 with three recurring LLM techniques: (i)~\textbf{Retrieval-Augmented Generation}, where the LLM retrieves and filters relevant code or features before analysis (TraceRAG, AgenticRAG); (ii)~\textbf{Semantic Representation}, where the LLM converts raw artifacts into structured summaries or embeddings for downstream reasoning (AppPoet, LAMD); and (iii)~\textbf{Fine-tuning and Direct Classification}, where the model is trained on the task to emit the verdict directly (LLM-MalDetect, Structural-Semantic). Across all three, the LLM acts as an embedded component within an engineered pipeline rather than a standalone classifier, and performance is governed less by the LLM itself than by the surrounding components: context reduction through program analysis, retrieval granularity, prompt alignment, and structural representation fidelity. All six systems rely predominantly on static analysis, leaving dynamically loaded and reflectively invoked code as a persistent open challenge.
+\end{tcolorbox}

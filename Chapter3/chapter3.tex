@@ -1,31 +1,257 @@
-\chapter{Proposed Evaluation Methodology}
+\chapter{Systematic Literature Review}
 \label{Chapter3}
 
-\section{Overview}
+This chapter presents the first phase of the thesis: a Systematic Literature
+Review (SLR) of LLM-based Android malware detection. Its purpose is to map the
+emerging research landscape, consolidate how Large Language Models (LLMs) are
+being integrated into detection pipelines, and identify the gaps that the
+empirical evaluation in Chapters~\ref{Chapter4} and~\ref{Chapter5} sets out to
+address. The review protocol, its four research questions, and the synthesis of
+findings are all reported below, together with a threats-to-validity analysis.
 
-\textit{[TODO: Give a high-level overview of the evaluation framework used to
-compare LLM-based Android malware detection methods, including the candidate
-methods selected (one of which builds on the LAMD framework) and how they are
-compared fairly.]}
+\section{Introduction}
 
-\section{Candidate Methods}
+The rapid growth of mobile applications has reshaped daily life, with the Android operating system dominating the global market and capturing over 70\% of the total market share~\cite{odea2025android,counterpoint2025smartphones}. This ubiquity has also made Android a primary target for cybercriminals, leading to a continual rise in malware threats that compromise user privacy, financial security, and sensitive data. Modern malware evolves quickly, employing advanced evasion tactics and concealing malicious logic within otherwise legitimate application functions~\cite{mccart2025androidmalware}.
 
-\textit{[TODO: Describe each candidate method under evaluation: how it works,
-what inputs it requires, and any modifications made to integrate it into a
-common evaluation pipeline.]}
+Over the past decade, many learning-based approaches, including conventional machine learning (ML) and deep learning (DL) models, have been developed for Android malware detection~\cite{xu2019droidevolver,kim2019multimodal,cai2021jowmdroid,liu2024unraveling}. Although these models achieve strong detection performance, they face persistent challenges in real-world threat environments. Traditional detectors often suffer from concept drift, where performance degrades when the model is exposed to new or evolving malware variants such as zero-day attacks~\cite{barbero2022transcending}. This problem largely stems from dataset dependencies that introduce bias and limit generalization. In addition, most traditional detection systems operate as ``black boxes'' that offer little in the way of causal, verifiable, or human-readable explanations for their predictions~\cite{pendlebury2019tesseract,Li2024-wl}. Such opacity hinders security analysts from extracting meaningful features, validating outcomes, or translating model insights into actionable defense strategies. Auditing, moreover, often requires systematic, evidence-based reporting rather than a simple summary~\cite{chen2017automated}. In short, many decision-driven solutions rely on statistical correlations within datasets rather than on a genuine understanding of the behavioral semantics underlying complex Android applications~\cite{Li2024-wl}.
 
-\section{Datasets}
+The emergence of Large Language Models (LLMs) has introduced a new paradigm for addressing these challenges~\cite{alkaraki2024exploring}. Both general-purpose LLMs (e.g., GPT, Claude, Grok, DeepSeek) and domain-specific code models (e.g., CodeLlama, CodeBERT) show strong capabilities in understanding programming semantics and contextual relationships~\cite{Ruellan2025}. Drawing on vast pre-trained knowledge, LLMs can generalize beyond predefined feature spaces and perform zero-shot inference~\cite{Qian2025-ua}. Their reasoning and generative abilities allow them to analyze complex code structures~\cite{Dong2025}, interpret semantics, and produce natural-language summaries that resemble detailed analyst reports~\cite{He2025-ma}.
 
-\textit{[TODO: Describe the dataset(s) of benign and malicious APKs used,
-how they were collected/labeled, and any preprocessing performed.]}
+Building on these capabilities, recent research has increasingly explored LLMs for fine-grained security tasks that extend beyond simple malware classification~\cite{Zheng2025-no}. LLMs have been used to transform raw static features, such as API calls, permissions, and URLs, into semantically rich functional summaries or descriptive representations of code behavior~\cite{Zhao2024-dw,Shota,Wu2025}. They also support explainability by generating analysis reports that expose the evidence behind a verdict, so that a security analyst can inspect and validate the reasoning rather than accept a bare label. This transparency is what we mean by improving analyst confidence in the model's output~\cite{Li2024-wl,Zhang2025-ot}. LLMs have further been applied to malware auditing and localization, helping to identify malicious functions, establish causal evidence, and construct coherent behavioral narratives~\cite{Zheng2025-no}.
 
-\section{Evaluation Metrics}
+With the rapid and diverse development of these approaches, the field of LLM-based Android malware detection has expanded considerably, producing a wide range of methods, frameworks, and evaluation strategies. This growing body of work remains fragmented, however. Studies adopt different datasets, metrics, and design philosophies, which makes it difficult to compare results or assess collective progress. There is therefore a clear need for a Systematic Literature Review (SLR) that consolidates these methods, synthesizes their findings, and offers a coherent picture of the current research landscape. Such a review can establish a unified perspective, highlight prevailing trends, and identify the gaps and opportunities that will guide the evaluation phase of this thesis.
 
-\textit{[TODO: Define the metrics used to compare methods, e.g. accuracy,
-precision, recall, F1-score, false positive/negative rates, and runtime
-cost.]}
+Accordingly, we conduct an SLR to synthesize emerging methodologies, report their effectiveness as published, and identify promising research directions. Since this area moves quickly and much of its foundational work first appears as preprints, the review deliberately includes grey literature (arXiv preprints) alongside peer-reviewed studies, which gives it the character of a multivocal literature review~\cite{garousi2019mlr}. This review draws on \textbf{6} primary studies that were systematically selected through the screening protocol detailed in Section~\ref{sec:design}. These studies, spanning both benchmarking efforts and novel framework proposals, support the following contributions:
 
-\section{Experimental Setup}
+\begin{itemize}
+    \item We present a taxonomy of LLM-based techniques for Android malware detection, cataloging the architectural and methodological trends observed across the corpus (RQ1, Section~\ref{sec:rq1}).
+    \item We synthesize and report the effectiveness of these approaches relative to conventional baselines as published by the primary studies, covering accuracy, generalization under temporal drift, and computational cost, without attempting a cross-study numerical ranking (RQ2, Section~\ref{sec:rq2}).
+    \item We identify critical limitations such as context constraints, computational overhead, and hallucination risks (RQ3, Section~\ref{sec:rq3}).
+    \item We outline promising future research directions, emphasizing hybrid architectures, domain-specialized model design, and solutions that enable practical, low-latency deployment (RQ4, Section~\ref{sec:rq4}).
+\end{itemize}
 
-\textit{[TODO: Describe the environment, tools, LLM models/versions, prompts
-or configurations, and procedure used to run each candidate method.]}
+The remainder of this chapter is organized as follows. Section~\ref{sec:method} describes the SLR methodology and the guidelines it follows. Section~\ref{sec:design} presents the review protocol, including the research questions, search strategy, eligibility criteria, and study-selection process. Section~\ref{sec:report} reports the synthesis results organized around the four research questions. Section~\ref{sec:threats} discusses threats to validity, Section~\ref{sec:relwork} positions this review against related secondary studies, and Section~\ref{sec:conclusion} summarizes the review.
+
+\section{Methodology}\label{sec:method}
+
+This review was conducted as a Systematic Literature Review (SLR) that charts how Large Language Models (LLMs) are being applied to Android malware detection. The protocol follows established evidence-based software-engineering guidance: the review guidelines of Kitchenham and Charters~\cite{kitchenham2007guidelines}, the snowballing procedure of Wohlin~\cite{wohlin2014guidelines}, and the PRISMA~2020 reporting checklist~\cite{Page2021PRISMA}. Together these keep the search, selection, extraction, and synthesis steps auditable.
+
+This review is not a quantitative meta-analysis. The primary studies use different datasets, labeling policies, and evaluation protocols, so their reported numbers cannot be compared directly. We therefore synthesize the studies methodologically. For each study, we examine how its pipeline is designed, which trade-offs it accepts, and where it performs well or poorly. Section~\ref{sec:report-framing} explains this framing in more detail.
+
+The protocol is organized into three phases:
+
+\begin{enumerate}
+    \item \textbf{Planning} -- We articulated the review goal, formulated four research questions, and designed a PICOC-based search strategy. The eligibility criteria were calibrated against pilot retrievals before they were frozen, so that the criteria themselves are explained rather than asserted (Section~\ref{sec:design}).
+
+    \item \textbf{Conducting} -- We executed the search across five digital libraries, deduplicated and screened the records in two stages (title/abstract followed by full-text), and complemented the search with one round of backward and forward snowballing. Records and decisions were managed in Parsif.al~\cite{parsifal} to keep the audit trail consistent across reviewers, and the PRISMA~2020 flow (Figure~\ref{fig:prisma}) captures the per-stage counts.
+
+    \item \textbf{Reporting} -- The retained studies were extracted along a shared data sheet (architecture, LLM role, features, dataset, labeling policy, split strategy, cost, runtime, explainability), then synthesized thematically per research question. We also report the metadata profile of the corpus (Section~\ref{sec:metadata}) and a dedicated threats-to-validity analysis (Section~\ref{sec:threats}).
+\end{enumerate}
+
+Two reviewers conducted each stage independently and reconciled disagreements through discussion; ties on borderline papers were resolved by re-reading the full text against the inclusion criteria rather than by majority vote. The protocol, search exports, and screening decisions are stored alongside the manuscript to support reproducibility.
+
+\section{Systematic Literature Review Protocol}\label{sec:design}
+
+\subsection{Research Planning}\label{sec:rqs}
+
+This study adopts an SLR approach to investigate LLM-based techniques and pipelines for Android malware detection. The goals are to characterize how LLMs are integrated into detection workflows, to consolidate the datasets, labeling policies, and evaluation protocols reported in the literature, and to identify research gaps and future directions. The reviewed studies report their results under different conditions, so we do not compare their numbers head to head. The synthesis instead focuses on each study's methodological choices, strengths, and weaknesses, as explained in Section~\ref{sec:report-framing}.
+
+The following research questions operationalize these objectives:
+
+\begin{itemize}
+    \item \textbf{RQ1:} What LLM-based techniques have been proposed for Android malware detection?
+    \item \textbf{RQ2:} How effective are LLM-based approaches for addressing the problem, and under what evaluation assumptions?
+    \item \textbf{RQ3:} What are the challenges and limitations of using LLMs for Android malware detection?
+    \item \textbf{RQ4:} What are the potential future improvements in Android malware detection using LLMs, considering the current limitations?
+\end{itemize}
+
+\subsection{Search Keywords}\label{sec:keywords}
+
+Search keywords were derived using the PICOC framework (Population, Intervention, Comparison, Outcome, Context)~\cite{petticrew2008systematic} and refined across several pilot searches: synonyms were added when a pilot search missed relevant work, and overly generic terms were dropped when they returned large volumes of unrelated records. Three keyword groups were identified to cover the principal dimensions of the review.
+
+\textit{Group 1 (Population)} captures the target problem domain, encompassing Android malware and related mobile security threats. Synonyms and near-equivalent terms (e.g., ``android malware'', ``mobile malware'', ``APK malware'', ``malicious android'') were included to cover the mobile security landscape and APK-level artifacts.
+
+\textit{Group 2 (Intervention)} enumerates the technologies under examination, namely Large Language Models and their associated methodologies. The group spans general-purpose models, model families, and code-specialized variants to ensure coverage of the full spectrum of LLM techniques applied to malware-related analysis.
+
+\textit{Group 3 (Context)} anchors the search to the deployment environment, specifically security inspection within software and application domains. Studies focused exclusively on privacy rather than security were considered out of scope.
+
+The complete set of terms in each group is listed below:
+
+\begin{itemize}
+    \item \textbf{Group 1 (Population):} android malware, mobile malware, APK malware, android threats, mobile threats, malicious android, android security, malicious APK
+    \item \textbf{Group 2 (Intervention):} llm, large language model, transformer, prompt, few-shot, gpt, gpt-4, llama, llama2, llama3, llama4, mistral, codellama, starcoder, roberta, codebert, codet5, gemini, claude, qwen
+    \item \textbf{Group 3 (Context):} software, security, system, application
+\end{itemize}
+
+\subsection{Inclusion and Exclusion Criteria}\label{sec:criteria}
+
+The eligibility criteria are summarized in Table~\ref{tab:inclusion-exclusion} and follow the objectives stated in Section~\ref{sec:rqs}. Criteria I1, I2, E1, and E2 are self-explanatory; we therefore clarify only the criteria whose intent is less obvious.
+
+Criterion E3 excludes opinion and position pieces that report no detection performance, since RQ2 depends on extractable evaluation evidence. Criterion E4 removes papers that mention or use an LLM only outside the detection pipeline, for example for synthetic data generation alone, because such work does not show how LLMs perform detection. Criterion E6 sets the publication cut-off at 2020. We treat the release of GPT-3 in June 2020 as the point at which contemporary LLMs began to show the scale-dependent reasoning, in-context learning, and code-understanding behaviors that this review studies~\cite{brown2020gpt3}. Earlier work mostly relies on small encoder-only models (e.g., early BERT variants) that lack these generative, prompt-driven properties, and the few pre-2020 candidates found during the pilot search confirmed this. Finally, the secondary studies removed under E5 are not discarded outright: they are revisited for comparison in Section~\ref{sec:relwork}.
+
+\begin{table}[htbp]
+\centering
+\caption{Inclusion and exclusion criteria with rationale}
+\label{tab:inclusion-exclusion}
+\begin{tabularx}{\columnwidth}{lX}
+\toprule
+\textbf{ID} & \textbf{Criterion} \\
+\midrule
+\multicolumn{2}{l}{\textit{Inclusion}} \\
+I1 & Studies focused on Android malware detection (platform-specific scope) \\
+I2 & Studies using an LLM as a core component of the detection approach \\
+\midrule
+\multicolumn{2}{l}{\textit{Exclusion}} \\
+E1 & Duplicates, posters, and papers without a full-text version \\
+E2 & Non-English papers \\
+E3 & Papers not reporting detection performance on Android malware \\
+E4 & Papers not applying an LLM in the detection methodology \\
+E5 & Secondary studies (surveys, reviews, mapping studies) \\
+E6 & Papers published prior to 2020 (post-GPT-3 LLM era) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Search Process}\label{sec:databases}
+
+We conduct our search from five well-known databases:
+\begin{itemize}
+    \item ACM Digital Library
+    \item IEEE Xplore Digital Library
+    \item SpringerLink
+    \item Scopus
+    \item arXiv
+\end{itemize}
+
+These five venues are commonly recommended as starting points for software-engineering SLRs~\cite{kitchenham2007guidelines}. ACM, IEEE, SpringerLink, and Scopus index most peer-reviewed venues in security and software engineering. The fifth source, arXiv, is a grey-literature venue: its manuscripts are published informally and are not peer reviewed. Much of the most recent and most widely cited LLM work in this area exists only as preprints, and omitting them would bias the review toward slower-moving, peer-reviewed work.
+
+The search string was assembled from the three PICOC-derived keyword groups described in Section~\ref{sec:keywords}, combining them as follows:
+
+\begin{quote}
+(G1-1 OR G1-2 OR $\ldots$) AND (G2-1 OR G2-2 OR $\ldots$) AND (G3-1 OR G3-2 OR $\ldots$),
+\end{quote}
+
+\noindent where G$x$-$y$ denotes the $y$-th term of Group $x$.
+
+Queries were executed across the five databases listed above on 1~November 2025. Results were ranked by relevance, with a cap of 400 studies per database applied to bound the screening workload. For arXiv, the threshold was reduced to 200 articles to account for the elevated proportion of pre-publication manuscripts. All metadata were exported and imported into Parsif.al~\cite{parsifal} to support structured management and screening. The raw database yields were: ACM Digital Library (346), arXiv (210, capped from a larger pool), IEEE Xplore (77), Scopus (400, capped), and SpringerLink (400, capped), for a total of 1{,}433 records before deduplication.
+
+\subsection{Study Selection}\label{sec:selection}
+Article selection followed a two-stage screening procedure anchored to the eligibility criteria in Section~\ref{sec:criteria}. A study was retained only if it satisfied all inclusion criteria (I1 and I2) and triggered none of the exclusion criteria (E1--E6). Meeting a single inclusion criterion was not sufficient, whereas matching any one exclusion criterion was enough to reject a study.
+
+In the first stage, we screened each record on its title, abstract, keywords, and conclusion, examined in that order. The exclusion criteria were applied first: a record that clearly matched any exclusion criterion was removed immediately, while records that appeared relevant or remained ambiguous were carried forward. In the second stage, the two reviewers independently read the full text of each surviving candidate and confirmed that all inclusion criteria were met and no exclusion criterion applied before agreeing on a final decision. Applying the exclusion criteria first kept the costly full-text reading focused on records that were already plausibly in scope. After both stages, \textbf{5} studies were retained.
+
+To complement the database search and improve overall coverage, backward and forward snowballing were carried out in accordance with Wohlin's guidelines~\cite{wohlin2014guidelines}. Backward snowballing involved a systematic review of the reference sections of all included studies, targeting relevant works that the keyword-based search may have missed. Forward snowballing involved querying Google Scholar to retrieve all articles that had cited papers in the current pool. Candidate studies identified through both directions were subjected to the same inclusion and exclusion criteria applied during primary screening. This process yielded \textbf{1} additional study, bringing the final set to \textbf{6} included papers. The final pool was completed on December~12, 2025, and the list of included studies is presented in Table~\ref{tab:selected-papers}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{prisma.png}
+    \caption{PRISMA diagram of the selection process.}
+    \label{fig:prisma}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{List of selected studies}
+\label{tab:selected-papers}
+\begin{tabularx}{\textwidth}{Xll}
+\toprule
+\textbf{Title} & \textbf{Author(s)} & \textbf{Year} \\
+\midrule
+A structural-semantic approach integrating graph-based and LLM representation~\cite{Khan2024-hy}         & Khan \& Kwon  & 2024 \\
+AppPoet: LLM-based Android malware detection via multi-view prompt engineering~\cite{Zhao2024-dw}        & Zhao et al.   & 2024 \\
+Enhancing Android malware detection with Retrieval-Augmented Generation~\cite{S2025-kj}                  & Saraga et al. & 2025 \\
+LAMD: Context-driven Android malware detection and classification with LLMs~\cite{Qian2025-ua}           & Qian et al.   & 2025 \\
+LLM-MalDetect: A large language model-based method for Android malware detection~\cite{Feng2025-ry}      & Feng et al.   & 2025 \\
+TraceRAG: A LLM-based framework for explainable Android malware detection~\cite{Zhang2025-ot}            & Zhang et al.  & 2025 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Reporting Results}\label{sec:report}
+
+\subsection{Overview of Selected Articles}
+
+The six studies retained after screening were all published in 2024--2025. This narrow window reflects how recently LLMs have been adopted for Android malware detection and indicates that the field is still in a formative stage. Despite the short timespan, the studies differ considerably in how they use LLMs, ranging from retrieval-augmented reasoning over decompiled source code to fine-tuning compact open-source models on structured feature sets, and from multi-view prompt engineering to hybrid graph-and-embedding designs. The detailed findings behind these differences are presented under the four research questions defined in Section~\ref{sec:design}; here we set out only the framing of the synthesis and the publication-level profile of the corpus.
+
+To complement the per-question synthesis, we also summarize the publication-level characteristics of the six retained studies (Table~\ref{tab:metadata}).\label{sec:metadata} Three observations follow from Table~\ref{tab:metadata}. First, the corpus is heavily skewed toward 2025 and toward arXiv preprints; this reflects the recency of LLM adoption and means that several findings have not yet completed peer review -- a point we revisit in Section~\ref{sec:threats}. Second, although the corpus is small, it is geographically distributed and is not dominated by a single lab: the Cavallaro group at King's College London is the most prolific cluster (LAMD and two related benchmarking studies that we cite as context), but four of the six retained primary studies come from independent groups. Third, half of the corpus releases code or prompts publicly, which constrains how reliably the remaining studies can be replicated and is a recurring driver of the comparability concerns in Section~\ref{sec:threats}.
+
+\begin{table}[htbp]
+\centering
+\caption{Metadata profile of the six retained studies}
+\label{tab:metadata}
+\footnotesize
+\begin{tabularx}{\columnwidth}{lX}
+\toprule
+Attribute & Value \\
+\midrule
+Publication years & 2024 (2), 2025 (4) \\
+Venue types & 4 preprints (arXiv), 1 journal (IEEE Access), 1 book chapter (IFIP/Springer) \\
+Top author affiliation regions & UK/EU (Cavallaro group: LAMD), Asia (Zhao, Feng, Khan, Zhang), South-Asia/EU collab.\ (Saraga et al.) \\
+Most frequent author cluster & Cavallaro group at King's College London (LAMD)~\cite{Qian2025-ua} and benchmarking work~\cite{He2025-ma,Zheng2025-no} \\
+Recurring co-authors & Qian, Zheng, He, Cavallaro appear in LAMD, benchmarking, and behavior-auditing papers \\
+Geographic spread & China (3), South-Korea (1), Italy/India (1), UK (1) \\
+Open-source artifact released? & 3/6 (LAMD, AppPoet, AgenticRAG); not released by TraceRAG, LLM-MalDetect, Structural-Semantic \\
+LLM backbone family & GPT-4 / GPT-4o-mini / o3-mini (3), Gemini Flash (1), Mistral-7B + LoRA (1), CodeBERT (1) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{6pt}
+
+\input{Chapter3/rq1}
+\input{Chapter3/rq2}
+\input{Chapter3/rq3}
+\input{Chapter3/rq4}
+
+\section{Threats to Validity}\label{sec:threats}
+
+Following the categorization common in software-engineering SLRs~\cite{kitchenham2007guidelines, wohlin2014guidelines}, we discuss threats to construct, internal, external, and conclusion validity. The measures described below limit each threat but do not remove it; the issues raised here remain genuine limitations of this review.
+
+\subsection{Construct Validity}
+Construct validity concerns whether the search and extraction actually capture ``LLM-based Android malware detection.'' The keyword groups (Section~\ref{sec:keywords}) may miss work that uses non-canonical terminology (e.g., ``foundation model for security'') or that frames itself as program analysis, while the broad Intervention list may over-retrieve studies that only mention LLMs. To limit this, we derived the PICOC groups iteratively from pilot searches, added synonyms where pilot recall was low, screened in two stages with two independent reviewers, and used backward and forward snowballing as a second retrieval channel. A limitation remains: the 2020 cut-off (criterion E6, Section~\ref{sec:criteria}) excludes pre-GPT-3 encoder-only work, so readers who count encoder-only models below 1\,B parameters as ``LLMs'' will find our scope narrower than theirs.
+
+\subsection{Internal Validity}
+Internal validity concerns whether the synthesis faithfully reflects the primary studies. The reported figures are conditioned on dataset choice, VirusTotal labeling threshold, and split strategy (Tables~\ref{tab:rq4_summary} and~\ref{tab:cost-model}), so reading them as comparable across studies would silently absorb these differences. To limit this, Section~\ref{sec:report-framing} states that we do not rank systems by a single number, each figure is annotated with the protocol that produced it, the cost model is broken out per study, and missing values are marked ``not reported'' rather than imputed. We nonetheless rely on each paper's self-report for cost, runtime, and labeling; where a paper is silent (e.g., the VirusTotal threshold for AppPoet, the hardware for Structural-Semantic), the missing detail cannot be verified independently.
+
+\subsection{External Validity}
+External validity concerns how far the conclusions generalize. The corpus is small, six studies, four of them arXiv preprints, so it may reflect an early-adopter subcommunity rather than the field at large, and findings may shift once peer review introduces revisions. Because the review depends substantially on grey literature, we screened these preprints against the same eligibility criteria as peer-reviewed work and applied the additional grey-literature quality assessment described in Section~\ref{sec:method}, following Garousi et al.~\cite{garousi2019mlr}; this limits, but does not remove, the risk that a preprint's results change on publication. We make these characteristics explicit in the metadata analysis (Section~\ref{sec:metadata}, Table~\ref{tab:metadata}) so readers can calibrate each claim against the evidence base.
+
+\subsection{Conclusion Validity}
+Conclusion validity concerns whether the qualitative claims are well supported. Qualitative synthesis is exposed to reviewer bias, since the same paper can support several narratives depending on which passages are emphasized. We anchor each thematic claim to at least one citation, keep the key-takeaway boxes tied to the evidence discussed in the body, and structure the synthesis around the four research questions. With only six primary studies, however, individual choices, such as which paper to feature where and which baseline to quote, measurably shape the narrative, and a different reviewer pair might emphasize different trade-offs on the same corpus.
+
+\section{Related Work}\label{sec:relwork}
+
+Android malware detection has been extensively studied over the past decade, producing a substantial body of work that spans static, dynamic, and hybrid analysis techniques underpinned by conventional machine learning and deep learning models. Static approaches typically extract features such as permissions, API calls, and opcode sequences from application packages, while dynamic methods monitor runtime behaviors including system calls and network traffic \cite{xu2019droidevolver, kim2019multimodal, cai2021jowmdroid}. Recent systematic reviews have comprehensively surveyed this landscape: Dahiya et al.\ \cite{dahiya2025} provide an up-to-date synthesis of static, dynamic, hybrid, and graph-based detection methods, whereas Guerra-Manzanares \cite{guerra2024} critically examines persistent open challenges, including methodological flaws, dataset limitations, and the fragility of models against concept drift and adversarial evasion \cite{barbero2022transcending, pendlebury2019tesseract}. Despite the maturity of these approaches, most detection systems continue to operate as opaque classifiers that offer limited explainability, hindering security analysts from validating predictions or translating model outputs into actionable intelligence \cite{Li2024-wl}.
+
+More recently, Large Language Models have emerged as a promising complement to traditional detection pipelines, leveraging pre-trained semantic knowledge to analyze code structures, generate human-readable explanations, and perform zero-shot or few-shot inference on previously unseen threats \cite{alkaraki2024exploring}. Al-Karaki et al.\ \cite{alkaraki2024exploring} review LLM applications across five malware-related tasks, including code analysis, threat identification, and disguised malware detection, while Guo et al.\ \cite{guo2025} survey how self-supervised models such as CodeBERT and GPT-4 are applied to both static and dynamic malware analysis. However, these reviews address malware detection broadly without distinguishing the unique challenges posed by the Android ecosystem, such as the permission model, inter-component communication, and the diversity of application marketplaces. To the best of our knowledge, no systematic literature review has specifically examined the intersection of LLMs and Android malware detection. Table~\ref{tab:relwork-comparison} positions the present SLR against the most closely related secondary studies.
+
+\begin{table}[htbp]
+\centering
+\caption{Position of this SLR relative to existing secondary studies on Android/malware detection and on LLMs in security. ``\checkmark'' = explicitly covered; ``$\sim$'' = partial coverage; ``--'' = not covered.}
+\label{tab:relwork-comparison}
+\footnotesize
+\begin{tabularx}{\textwidth}{Xcccccc}
+\toprule
+Secondary study & Year & \rotatebox{90}{Android-specific~} & \rotatebox{90}{LLM-specific~} & \rotatebox{90}{Methodology synthesis~} & \rotatebox{90}{Cost / runtime~} & \rotatebox{90}{Threats to validity~} \\
+\midrule
+Dahiya et al.~\cite{dahiya2025}            & 2025 & \checkmark      & --                & \checkmark              & --                       & $\sim$ \\
+Guerra-Manzanares~\cite{guerra2024}        & 2024 & \checkmark      & --                & \checkmark              & --                       & \checkmark \\
+Al-Karaki et al.~\cite{alkaraki2024exploring} & 2024 & $\sim$ (broader malware) & \checkmark & \checkmark           & --                       & --     \\
+Guo et al.~\cite{guo2025}                  & 2025 & $\sim$           & \checkmark        & \checkmark              & --                       & --     \\
+Koushki et al.~\cite{Koushki2022}          & 2022 & \checkmark      & --                & \checkmark (taxonomy)   & --                       & $\sim$ \\
+\textbf{This SLR}                          & 2025 & \checkmark      & \checkmark        & \checkmark              & \checkmark (normalized)  & \checkmark \\
+\bottomrule
+\end{tabularx}
+
+\vspace{2pt}
+\footnotesize\textit{Note.} ``Methodology synthesis'' indicates explicit discussion of design choices and trade-offs rather than only reporting accuracy figures. ``Cost / runtime analysis'' indicates a per-study breakdown of pricing assumptions, token counting, and what is included in the runtime measurement (see Table~\ref{tab:cost-model}).
+\end{table}
+
+Three observations follow from Table~\ref{tab:relwork-comparison}. First, the existing Android-focused reviews~\cite{dahiya2025,guerra2024,Koushki2022} predate the widespread adoption of LLMs for detection and do not treat LLM-specific concerns (prompt engineering, hallucination, retrieval augmentation, token cost). Second, the LLM-focused reviews~\cite{alkaraki2024exploring,guo2025} address malware analysis broadly without isolating the Android ecosystem, so they do not engage with Android-specific artifacts (DEX, manifest, ICC). Third, none of the prior reviews normalize cost and runtime reporting or document a per-study labeling policy, which we identify as a key reason direct numerical comparison across the surveyed primary studies is unreliable.
+
+\section{Chapter Summary}\label{sec:conclusion}
+
+This chapter presented a Systematic Literature Review of LLM-based approaches for Android malware detection, synthesizing findings from 6 primary studies selected from an initial pool of 1,433 candidates via a PICOC-based search and a two-stage screening process. The reviewed studies reveal three primary paradigms: Retrieval-Augmented Generation, Semantic Representation, and Fine-tuning and Direct Classification. Across all three, the LLM is embedded within an engineered pipeline rather than used as a standalone classifier, and the surrounding components shape both detection quality and interpretability. The six studies report accuracy ranging from roughly 90\% to 99\% as published, generally above their conventional ML/DL baselines, and consistently note the advantage of producing natural-language behavioral explanations that support analyst investigation. Persistent challenges remain, however, including hallucination on obfuscated inputs, context-window constraints for large applications, high per-sample inference cost, and the scarcity of fine-grained, function-level benchmarks.
+
+Looking forward, the reviewed literature converges on three directions to address these limitations: the development of domain-specialized LLMs trained on Android security corpora to reduce hallucination and improve robustness, the design of hybrid architectures that pair LLM reasoning with lightweight classifiers or structural graph models for reliable binary decisions, and the integration of dynamic execution traces to detect behaviorally activated malware. This review shows that LLM-based approaches represent a meaningful step forward in semantic understanding and explainability for Android malware detection, while identifying reliability, scalability, and deployment efficiency as the critical open challenges. These findings directly motivate the evaluation carried out in the remainder of this thesis, in which one of the candidate methods builds on the LAMD framework~\cite{Qian2025-ua} introduced above.

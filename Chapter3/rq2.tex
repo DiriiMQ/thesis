@@ -1,0 +1,148 @@
+\section{RQ2: How effective are LLM-based approaches for addressing the problem?}\label{sec:rq2}
+
+We consider the effectiveness of LLM-based Android malware detection along three dimensions. The first is detection accuracy relative to traditional baselines. The second is resilience to temporal distribution drift. The third is the practical trade-off between computational cost and runtime efficiency. As explained in Section~\ref{sec:report-framing}, we report each figure as its authors published it and discuss the conditions under which it holds.
+\label{sec:report-framing}
+Before reporting the findings, we make the orientation of the synthesis explicit. The reviewed studies use different datasets (AndroZoo, Drebin, CICMaldroid, CICAndMal, RePack), VirusTotal labeling thresholds ($\geq$1 vs.\ $>$4 detections), train/test splitting strategies (random vs.\ temporal), pre-processing pipelines (decompilation, slicing, summarization), and LLM backbones that span closed-source APIs and locally hosted open-weight models. Under these conditions, a direct numerical comparison of accuracy or F1 is not defensible: the same APK can be labeled differently across studies, token costs are not normalized, and ``per-APK'' runtime conflates preprocessing with inference. This review therefore does not rank the surveyed systems by a single performance number. The following subsections instead report the methodology, design choices, strengths, and limitations of each approach, together with the trade-offs and evaluation assumptions behind every reported result. Where we quote numerical figures, they are reproduced verbatim from the source papers and read as evidence of the conditions under which a study reports its result, not as cross-study claims about which method is best. This framing follows the objectives stated in Section~\ref{sec:rqs} and is revisited in the threats-to-validity analysis (Section~\ref{sec:threats}).
+
+\subsection{Dataset, Benchmark and Evaluation Metrics}
+
+\begin{table}[htbp]
+\centering
+\caption{Datasets, metrics, and evaluation protocols across reviewed studies}
+\label{tab:rq4_summary}
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{1.5\textwidth}{lXrXXXXX}
+\toprule
+Study & Dataset(s) & Size & Primary Metrics & Labeling Policy (VT thr.) & Split Strategy & Dyn./Native Coverage & Explainability Mechanism \\
+\midrule
+TraceRAG~\cite{Zhang2025-ot}            & AndroZoo                          & 100    & Acc, P, R, F1   & VT updated + manual expert verification (threshold not fixed; relabel) & Random (no temporal)            & Static only (Java decompiled; no native, no dyn.\ loading) & Multi-turn LLM analysis report w/ code citations \\
+AgenticRAG~\cite{S2025-kj}              & AndroZoo                          & 18{,}000 & Acc, R, F1     & $\geq$1 VT engine flags the sample          & Random (no temporal)            & Static only (Manifest features)                         & Partial -- RAG-retrieved descriptions but final verdict from BERT classifier \\
+AppPoet~\cite{Zhao2024-dw}              & AndroZoo                          & 23{,}317 & Acc, P, R, F1  & Author-reported VT consensus (threshold not stated) & Random (no temporal)            & Static only (Permissions, APIs, URLs)                   & View-summary diagnostic report \\
+LAMD~\cite{Qian2025-ua}                 & AndroZoo                          & 13{,}794 & F1, FPR, FNR   & $>$4 VT engines flag the sample             & \textbf{Temporal} (train 2014--19, test 2020--23) & Static only (sliced CFG)                              & Three-tier reasoning with Data Relationship Coverage verification \\
+LLM-MalDetect~\cite{Feng2025-ry}        & Drebin, CICAndMal, AndroZoo, RePack & 41{,}000 & Acc, P, R, F1 & Inherited from each source dataset          & \textbf{Temporal} (AndroZoo 2023--24 holdout) & Static only (Manifest + DEX + resources)               & Partial -- LoRA fine-tuned model emits a label and brief rationale \\
+Structural-Semantic~\cite{Khan2024-hy}  & AndroZoo, CICMaldroid2020         & 9{,}000  & Acc, F1        & Inherited from CICMaldroid2020 + AndroZoo VT labels & Random (no temporal)            & Static only (call graph)                                & No -- end-to-end GAT classifier; no natural-language output \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{2pt}
+\footnotesize\textit{Note.} ``Threshold not stated'' indicates the original paper does not document the VirusTotal threshold used to assign positive labels; we record this absence rather than impute a value, because the threshold can shift reported accuracy by several percentage points (see TraceRAG's relabeling discussion). ``Static only'' means the system reasons over decompiled Java/Kotlin or manifest artifacts and does not execute the APK, attach to a sandbox, or analyze native libraries.
+\end{table}
+
+A notable point of consistency across the reviewed studies is their shared reliance on AndroZoo as the primary APK source, with VirusTotal scan results commonly used for ground-truth labeling. However, dataset sizes vary substantially, ranging from TraceRAG's small-scale evaluation of just 100 samples to LLM-MalDetect's large 41{,}000-sample corpus spanning multiple benchmark datasets. This disparity is the first reason direct accuracy comparisons between studies must be read with caution: models evaluated on fewer, potentially curated samples may report inflated figures compared to those tested at scale.
+
+A second critical methodological divide separates studies that apply a temporal train-test split from those that do not. LAMD~\cite{Qian2025-ua} and LLM-MalDetect~\cite{Feng2025-ry} deliberately separate training and testing samples by year to simulate real-world deployment conditions, where future malware is structurally different from known threats. In contrast, TraceRAG~\cite{Zhang2025-ot}, AppPoet~\cite{Zhao2024-dw}, AgenticRAG~\cite{S2025-kj}, and Structural-Semantic~\cite{Khan2024-hy} do not apply temporal splits, which risks overestimating generalization ability~\cite{pendlebury2019tesseract,barbero2022transcending}.
+
+A third axis of divergence is the labeling policy itself. AgenticRAG~\cite{S2025-kj} labels a sample as malicious when \emph{any} VirusTotal engine flags it ($\geq$1 detection), whereas LAMD~\cite{Qian2025-ua} requires $>$4 detections. TraceRAG~\cite{Zhang2025-ot} shows that refreshing VirusTotal labels and adding manual expert verification raised reported accuracy from 90\% to 96\%. The same APK can therefore be benign in one study and malicious in another, which directly compromises cross-study comparability.
+
+Traditional baselines such as Drebin (string-based features) and Malscan (graph-based analysis) are the most frequently referenced benchmarks. More recent approaches compare against deep learning and hybrid systems such as MaMaDroid, DroidFusion, and DroidMDetection. AgenticRAG~\cite{S2025-kj} takes a different approach, benchmarking against transformer-based security models such as CySecBERT~\cite{Bayer2024} and SecBERT~\cite{Huang2024} rather than traditional feature engineering baselines.
+
+Nearly all studies report Accuracy, Precision, Recall, and F1-score. LAMD~\cite{Qian2025-ua} additionally reports False Positive Rate (FPR) and False Negative Rate (FNR) to account for class imbalance, while LLM-MalDetect~\cite{Feng2025-ry} argues that Recall should be prioritized over FPR in security-critical settings, since missing a malware sample is typically more consequential than generating a false alarm.
+
+\subsection{Detection Effectiveness (Accuracy \& F1-Score)}
+
+Table~\ref{tab:binary-performance-summary} reproduces the accuracy or primary performance metric of each proposed framework against its strongest reported baseline. Per Section~\ref{sec:report-framing}, the figures are recorded as-published; the qualitative discussion that follows the table interprets each result in the context of its own evaluation protocol rather than ranking the systems against one another.
+
+\begin{table}[htbp]
+\centering
+\caption{Binary classification performance as reported in each study. Figures are reproduced from the original papers; cross-study ranking is not warranted because datasets, VT thresholds, and split strategies differ (see Table~\ref{tab:rq4_summary}).}
+\label{tab:binary-performance-summary}
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{1.3\textwidth}{lll}
+\toprule
+Study & Proposed Model (Accuracy / F1) & Key Baseline (Accuracy / F1) \\
+\midrule
+TraceRAG~\cite{Zhang2025-ot} & 96.00\% (Updated VT + expert verified) & -- \\
+AgenticRAG~\cite{S2025-kj} & 92.89\% (CySecBERT) & 91.36\% (Gemini Fusion + CySecBERT) \\
+AppPoet~\cite{Zhao2024-dw} & 97.15\% (MLP classifier) & 96.06\% (Drebin-MLP) \\
+LAMD~\cite{Qian2025-ua} & 90.24\% (F1, Test Set 1) & 81.33\% (Drebin F1) \\
+LLM-MalDetect~\cite{Feng2025-ry} & 98.97\% (Mistral LoRA, Drebin) & 96.76\% (DroidFusion) \\
+Structural-Semantic~\cite{Khan2024-hy} & 93.22\% (CodeBERT-GAT) & 92.71\% (GPT / RoBERTa) \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+Each LLM-based system reports a numerical advantage over its chosen baseline, but the magnitude and meaning of that advantage are mediated by the evaluation choices captured in Table~\ref{tab:rq4_summary}. We therefore discuss each study on its own terms rather than as part of a ranking.
+
+LLM-MalDetect~\cite{Feng2025-ry} reports the highest raw accuracy at 98.97\% using Mistral 7B with LoRA fine-tuning on the Drebin dataset, surpassing DroidFusion by 2.21 percentage points (96.76\%). However, this figure is obtained on the legacy Drebin dataset, which may not reflect modern malware diversity. When evaluated on AndroZoo-2024 samples under a temporal split, performance drops to an F1-score of 94.51\%, a meaningful gap that reveals the sensitivity of fine-tuned models to distribution shift. Notably, LLM-MalDetect is the only reviewed approach that fine-tunes an open-source LLM end-to-end, which likely explains its strong performance on structured feature sets but also limits interpretability compared to prompting-based methods.
+
+AppPoet~\cite{Zhao2024-dw} achieves 97.15\% accuracy, outperforming Drebin-MLP (96.06\%) and graph-based approaches such as Malscan (95.65\%). While the 1.09 percentage point margin over the strongest baseline may appear modest, AppPoet's contribution lies in its multi-view prompt engineering strategy, which generates semantically richer representations of app behavior than raw string or permission features can capture.
+
+LAMD~\cite{Qian2025-ua} employs the most rigorous evaluation design among all reviewed works, applying a strict temporal split where training samples (2014--2020) chronologically precede three incremental test sets spanning 2020--2023. Under these conditions, LAMD achieves an F1-score of 90.24\%, outperforming Drebin (81.33\%) and DeepDrebin (71.92\%) by margins of 8.91 and 18.32 percentage points, respectively. The relatively lower absolute accuracy compared to LLM-MalDetect or AppPoet should not be interpreted as a weakness; rather, it reflects a more honest evaluation under real-world drift conditions. Static-feature models such as Drebin are known to degrade sharply when tested on future samples~\cite{barbero2022transcending, pendlebury2019tesseract}, and LAMD demonstrates that LLM-based context understanding can substantially close this gap.
+
+TraceRAG~\cite{Zhang2025-ot} operates at a different level of evaluation granularity. Its 96.00\% accuracy reflects performance after ground-truth relabeling via updated VirusTotal scans and manual expert verification to correct for label drift in the original AndroZoo dataset. Before relabeling, the accuracy was only 90.00\%, a 6-point difference attributable entirely to dataset quality rather than model capability. This finding is an important caveat for interpreting all studies that rely on static VirusTotal labels without validation~\cite{zhu2020benchmarking}. TraceRAG does not benchmark against traditional classifiers for binary detection; instead, it evaluates sandbox coverage, where even the best-performing baseline (VT Droidy) achieves only 37.00\% sample coverage versus TraceRAG's full coverage.
+
+AgenticRAG~\cite{S2025-kj} achieves 92.89\% accuracy with CySecBERT~\cite{Bayer2024} enhanced by RAG-augmented semantic descriptions, improving marginally over the Gemini Fusion baseline (91.36\%). However, the narrow margin of 1.53 percentage points over the Gemini Fusion baseline is notable given that SecBERT~\cite{Huang2024} with AgenticRAG descriptions achieves 93.31\%, surpassing CySecBERT with the same descriptions by 0.42 percentage points, suggesting that the choice of classifier backbone also contributes meaningfully to the final accuracy. The interaction between RAG-generated descriptions and specific classifier architectures warrants further investigation.
+
+The Structural-Semantic approach~\cite{Khan2024-hy} combines CodeBERT with a Graph Attention Network (GAT) over a large-scale call graph (481 million nodes, 1.537 billion edges), achieving 93.22\% accuracy. A particularly revealing finding is that alternative LLM-based feature extractors (GPT and RoBERTa) achieve 92.71\%, only 0.51 percentage points below CodeBERT-GAT, while traditional TF-IDF features achieve 89.20\%. The small gap between LLM variants (0.51 pp) versus the larger gap against TF-IDF (4.02 pp) suggests that the structural graph representation is the primary driver of performance, and the specific LLM used for feature extraction plays a secondary role.
+
+\subsection{Efficiency and Cost Analysis}
+
+Cost and runtime comparisons across the reviewed studies are intrinsically difficult because the studies do not share a uniform cost model: they price tokens at different vendor rates captured at different dates, they account for prompt and completion tokens inconsistently, and they include or exclude preprocessing and retrieval-embedding costs at their discretion. Table~\ref{tab:cost-model} therefore makes the cost model used by each study explicit before Table~\ref{tab:computational-cost-summary} reports the headline numbers.
+
+\begin{table}[htbp]
+\centering
+\caption{Per-study cost model -- what each study counts and what it omits}
+\label{tab:cost-model}
+\footnotesize
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{1.6\textwidth}{lXXXXX}
+\toprule
+Study & Pricing source \& date & Token counting method & Retrieval embeddings included? & Preprocessing included? & Storage included? \\
+\midrule
+TraceRAG~\cite{Zhang2025-ot} & OpenAI o3-mini list price as of Sep~2025 & Prompt + completion summed per call; method-level chunks priced individually & Embedding cost not separately reported (bundled with model calls) & \textbf{No} -- decompilation (Dex2Jar/CFR) reported separately, not priced & Not reported (vector store sized for 100 APKs) \\
+AgenticRAG~\cite{S2025-kj} & Gemini 2.0 Flash Lite list price; date not explicitly stated (paper June~2025) & Not reported in per-token detail & Sentence-Transformer embeddings hosted locally; cost not priced & \textbf{No} -- Manifest/feature extraction not priced & Vector store size for 18K APKs not reported \\
+AppPoet~\cite{Zhao2024-dw} & GPT-4 list price (paper April~2024, exact date not stated) & Prompt + completion via OpenAI API counter; Function Memory cache reduces effective tokens & N/A (no retrieval index) & \textbf{No} -- AndroGuard feature extraction excluded from cost & Not applicable (no persistent vector store) \\
+LAMD~\cite{Qian2025-ua} & GPT-4o-mini list price as of Feb~2025 & Prompt + completion via OpenAI API counter; reported per APK after backward slicing & N/A (no retrieval index) & \textbf{No} -- slicing reported as runtime overhead, not API cost & Not applicable \\
+LLM-MalDetect~\cite{Feng2025-ry} & Self-hosted (no API cost) & N/A (local inference; cost measured as wall-clock and VRAM) & N/A & Wall-clock includes feature extraction (3.25\,s of 4.51\,s) & Local disk; size not reported \\
+Structural-Semantic~\cite{Khan2024-hy} & CodeBERT self-hosted & N/A (encoder-only) & N/A & Call-graph construction reported separately & Local disk; size not reported \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Computational cost and efficiency as reported by each study}
+\label{tab:computational-cost-summary}
+\footnotesize
+\resizebox{\textwidth}{!}{%
+\begin{tabularx}{1.6\textwidth}{lXXXX}
+\toprule
+Study & Model / Setup & Cost & Runtime & Hardware \\
+\midrule
+TraceRAG~\cite{Zhang2025-ot}            & o3-mini; multi-threading       & \$6 / APK            & \textit{not reported}            & OpenAI API (cloud)        \\
+AgenticRAG~\cite{S2025-kj}              & Gemini 2.0 Flash Lite          & \textit{not reported}; vendor list-price only & \textit{not reported}; ``improved over 5\,s+ prior methods'' & Gemini API (cloud) \\
+AppPoet~\cite{Zhao2024-dw}              & GPT-4 + Function Memory; MLP   & \textit{not reported in \$/APK}; Function Memory reduces tokens & 14.02\,s & RTX 3090 (24\,GB) for MLP; GPT-4 via API \\
+LAMD~\cite{Qian2025-ua}                 & GPT-4o-mini; backward slicing  & \$0.199 / APK        & \textit{not reported per-APK}    & RTX A6000 \\
+LLM-MalDetect~\cite{Feng2025-ry}        & Mistral 7B + LoRA              & \textbf{No} API cost (local inference) & 4.51\,s (3.25\,s prep, 1.26\,s inference) & RTX 2080 Ti (8\,GB) \\
+Structural-Semantic~\cite{Khan2024-hy}  & GAT + CodeBERT                 & \textit{not reported} & \textit{not reported}            & \textit{not reported in the paper} \\
+\bottomrule
+\end{tabularx}%
+}
+
+\vspace{2pt}
+\footnotesize\textit{Note.} Per-APK dollar costs are not directly comparable because the underlying vendor prices were captured at different dates (Table~\ref{tab:cost-model}). All quoted runtimes exclude decompilation/feature extraction unless the source paper explicitly states otherwise (LLM-MalDetect is the one exception that does).
+\end{table}
+
+The cost and efficiency profiles of the reviewed approaches diverge sharply, revealing a fundamental tension between analytical depth and practical deployability.
+
+TraceRAG~\cite{Zhang2025-ot} represents the most expensive option, consuming over 100 million tokens and costing approximately \$6.00 per APK, totaling \$600 for just 100 samples. This cost is driven by the use of OpenAI's o3-mini reasoning model, which applies detailed code tracing and behavior summarization. By contrast, LAMD~\cite{Qian2025-ua} reduces cost to \$0.199 per APK through two mechanisms: backward program slicing to remove irrelevant code paths before prompting, and the use of GPT-4o-mini, a cost-efficient model that retains strong reasoning ability. Across 9{,}046 APKs, LAMD's total cost is approximately \$1{,}800, roughly 30 times cheaper than TraceRAG on a per-sample basis. We caution, however, that the two figures are not directly comparable: TraceRAG's price reflects OpenAI o3-mini list pricing as of September~2025, while LAMD reports GPT-4o-mini pricing as of February~2025; per-token rates and accounting (input vs.\ output tokens) differ accordingly (Table~\ref{tab:cost-model}). The structural conclusion -- that context compression substantially reduces cost -- nonetheless holds even after this caveat.
+
+LLM-MalDetect~\cite{Feng2025-ry} takes the most resource-efficient approach by locally hosting a fine-tuned Mistral 7B model on a consumer-grade 8~GB VRAM GPU, with no API dependency and a runtime of 4.51 seconds per APK that explicitly includes feature extraction. AppPoet~\cite{Zhao2024-dw} requires 14.02 seconds per APK, with the View Summary Generation stage consuming 8.77 of those seconds, making it approximately three times slower than LLM-MalDetect. The latency introduced by AppPoet's multi-stage prompt pipeline is not fully offset by its function-level caching mechanism, which reduces redundant token consumption but cannot eliminate the cost of multi-view summarization.
+
+All LLM-based approaches are substantially slower than traditional ML models, which typically operate in milliseconds. Despite this, LLM-based systems offer qualitative advantages (human-readable explanations and full sample coverage) that reduce downstream analyst workload and can justify the additional cost in high-stakes detection scenarios.
+
+A consistent strategy across the reviewed approaches is context optimization to manage the token overhead of Android APKs. LAMD~\cite{Qian2025-ua} uses backward program slicing to exclude irrelevant code paths. TraceRAG~\cite{Zhang2025-ot} splits Java source into method-level chunks to reduce hallucination risk from long contexts. AppPoet~\cite{Zhao2024-dw} and AgenticRAG~\cite{S2025-kj} cache frequently occurring permission and API descriptions to avoid repeated token generation. LLM-MalDetect~\cite{Feng2025-ry} sidesteps the token length problem entirely by operating on pre-extracted feature vectors rather than raw source code, which also explains its superior runtime.
+
+\begin{tcolorbox}[
+    title=\textbf{RQ2 -- Key Takeaways},
+    colback=white,
+    colframe=blue!60!black,
+    colbacktitle=blue!60!black,
+    fonttitle=\bfseries\color{white},
+    boxrule=0.5pt
+]
+LLM-based approaches each report gains over their chosen baselines, with a peak reported accuracy of 98.97\%; under temporal splits, the more conservative figures fall to 90--94\%. LAMD reports the strongest robustness to distribution drift under its own evaluation protocol. The corpus shows a recurring trade-off between explainability and cost: RAG-style systems produce traceable outputs but cost up to \$6 per APK, whereas fine-tuning-based methods report efficiency at the expense of interpretability. A cross-study numerical ranking is therefore not warranted; the comparison is anchored in methodology instead.
+\end{tcolorbox}

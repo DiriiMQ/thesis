@@ -1,0 +1,48 @@
+\section{RQ4: What are the potential future improvements in Android malware detection using LLMs, considering the current limitations?}\label{sec:rq4}
+
+Drawing on the challenges identified in RQ3, this section synthesizes research directions that could move LLM-based Android malware detection toward practical deployment. We organize them into directions already highlighted in the surveyed literature and complementary avenues that we recommend from our cross-paper analysis, presented in the two subsections that follow.
+
+\subsection{Directions Highlighted in Surveyed Papers}
+\leavevmode\par
+\textbf{Context engineering and input prioritization.}
+RQ3 identified the mismatch between large application codebases and LLM token limits as a primary bottleneck. Current mitigations, such as TraceRAG's method-level splitting and LAMD's tier-wise reasoning, reduce input size but risk fragmenting cross-method dependencies~\cite{Zhang2025-ot,Qian2025-ua}. LAMD demonstrates two complementary refinements that address this gap: (i)~multi-resolution representations that preserve call-graph structure while fitting within context windows, and (ii)~security-aware input filtering that seeds analysis with suspicious API calls and slices their dependency chains, so the model's attention concentrates on high-risk regions rather than boilerplate code~\cite{Qian2025-ua}. Together, these would allow pipelines to scale to larger apps without proportional growth in token consumption.
+
+\textbf{Native code and dynamic loading coverage.}
+Current static pipelines are confined to Java source recovered by decompilers, leaving JNI-backed native libraries and dynamically loaded DEX files unexamined~\cite{Zhang2025-ot}. Since malware increasingly hides payloads behind these mechanisms, extending LLM-based analysis to binary-level or intermediate representations of native code is a necessary next step flagged by the surveyed work.
+
+\textbf{Cost-effective model deployment.}
+The resource overhead documented in RQ3, notably \$600 for 100 apps (TraceRAG) and \$1\,800 for approximately 9\,000 apps (LAMD), motivates two strategies already demonstrated in the literature. First, smaller task-adapted models: LLM-MalDetect shows that 7B-parameter backbones can achieve competitive accuracy at a fraction of the API cost~\cite{Feng2025-ry}. Second, intermediate-result caching: AppPoet's Function Memory reuses previously generated summaries for recurring library functions, eliminating redundant LLM calls~\cite{Zhao2024-dw}. Scaling both strategies, through wider adoption of open-weight models and systematic caching of common code patterns, would substantially lower per-app cost.
+
+\textbf{Temporal robustness evaluation.}
+RQ3 noted the tension between LLM zero-shot generalizability and drift in malware distributions over time. LAMD's use of standardized temporal splits (training on older samples, testing on newer ones) provides a concrete protocol for quantifying drift resistance~\cite{Qian2025-ua}. Adopting such temporal evaluation as a community norm would enable meaningful cross-study comparison of long-term model reliability.
+
+\subsection{Author Recommendations}
+\leavevmode\par
+\textbf{Hybrid static-dynamic analysis.}
+All surveyed systems rely exclusively on statically extracted features, yet RQ3 showed that behaviors involving reflection, dynamic loading, and UI-driven fraud are invisible to static pipelines. Integrating dynamic analysis signals such as system-call traces, network traffic logs, and UI interaction sequences would capture runtime behaviors that static code inspection misses. LLMs are well suited for this fusion role: they can ingest structured execution traces alongside decompiled source and produce unified behavioral narratives that correlate static intent with observed runtime actions, bridging a gap that neither analysis mode addresses alone.
+
+\textbf{Hallucination mitigation and model reliability.}
+RQ3 documented that LLMs hallucinate non-existent vulnerabilities and produce inconsistent verdicts under prompt variation. While LAMD's factual consistency verification and AppPoet's DNN-based verdict override offer initial safeguards, these remain ad-hoc. We recommend developing systematic verification layers: cross-referencing LLM-generated claims against concrete code evidence (e.g., verifying that a cited API call actually exists in the call graph), ensemble voting across multiple prompt formulations to reduce sensitivity, and confidence-calibrated outputs that flag uncertain verdicts for human review rather than committing to a binary label.
+
+\textbf{Adversarial robustness.}
+No surveyed paper evaluates robustness against adversarial code transformations (e.g., renaming variables, inserting dead code, restructuring control flow) that preserve malicious functionality while altering surface-level features. Future work should (i)~train or fine-tune models on obfuscated variants to build invariance, (ii)~incorporate deobfuscation preprocessing steps before LLM analysis, and (iii)~construct adversarial benchmark suites that systematically apply evasion techniques, enabling standardized measurement of model resilience.
+
+\textbf{Cascaded architectures for scalable deployment.}
+Rather than routing every APK through expensive LLM reasoning, a two-stage pipeline can use lightweight ML classifiers (e.g., random forests on permission vectors or API-call frequencies) as a fast triage layer, reserving LLM analysis for samples where the classifier's confidence falls below a threshold. This cascaded design directly addresses the latency and cost constraints from RQ3 while maintaining high recall, since only ambiguous cases incur full LLM cost. Additionally, quantized open-weight models (4-bit or 8-bit) could enable on-device or edge-server inference for the triage layer, removing cloud dependency for initial screening.
+
+\textbf{APK vectorization for retrieval-augmented workflows.}
+Current RAG approaches (e.g., TraceRAG) embed code chunks at analysis time, incurring repeated embedding costs for each new query. Training a dedicated encoder to produce fixed-dimensional APK-level or function-level vectors would enable pre-indexing of known malware families, similarity-based retrieval of analogous samples, and clustering for family-level analysis, all without repeated full-context LLM calls. This shifts the expensive LLM reasoning from per-sample analysis to a one-time knowledge-base construction step, substantially reducing marginal cost at scale.
+
+\textbf{Evaluation standards.}
+Finally, we observe that cost and latency are inconsistently reported across the surveyed studies, making deployment comparisons difficult. Future work should adopt a minimum reporting standard that includes per-sample monetary cost, inference latency, and hardware requirements alongside accuracy metrics. Evaluation should also span multiple datasets with different labeling pipelines to establish generalization, rather than relying on a single benchmark.
+
+\begin{tcolorbox}[
+    title=\textbf{RQ4 -- Key Takeaways},
+    colback=white,
+    colframe=blue!60!black,
+    colbacktitle=blue!60!black,
+    fonttitle=\bfseries\color{white},
+    boxrule=0.5pt
+]
+Advancing LLM-based malware detection requires progress on four complementary fronts: integrating dynamic analysis signals to capture runtime behaviors invisible to static pipelines; reducing per-sample cost through smaller task-adapted models and cascaded triage architectures; building systematic hallucination safeguards beyond current ad-hoc verification; and adopting standardized temporal evaluation protocols and cost-reporting norms to enable meaningful cross-study comparisons.
+\end{tcolorbox}
