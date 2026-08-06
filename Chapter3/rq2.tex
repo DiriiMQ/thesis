@@ -10,7 +10,9 @@ Before reporting the findings, we make the orientation of the synthesis explicit
 \centering
 \caption{Datasets, metrics, and evaluation protocols across reviewed studies}
 \label{tab:rq4_summary}
-\resizebox{\textwidth}{!}{
+% Height-capped as well as width-capped: the caption and the note below leave
+% roughly 0.7\textheight for the body, and an uncapped \resizebox overflowed it.
+\adjustbox{max width=\textwidth,max totalheight=0.70\textheight}{
 \begin{tabularx}{1.5\textwidth}{lXrXXXXX}
 \toprule
 Study & Dataset(s) & Size & Primary Metrics & Labeling Policy (VT thr.) & Split Strategy & Dyn./Native Coverage & Explainability Mechanism \\
