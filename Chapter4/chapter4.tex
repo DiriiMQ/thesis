@@ -165,7 +165,7 @@ superseded intermediate variants}
 3b & Level-2 connection: same class, no LLM verification & Unsound -- caused a real false negative (unrelated methods sharing a generic utility class) & Fixed 2026-07-13 \\
 3c & Level-2 connection: same class, with LLM verification (current) & Same treatment as Level 3 & Adopted \\
 4a & Level-1 connection (same method): structurally guaranteed, no LLM verification & Still cost accuracy -- ``connected'' evidence is not necessarily malicious & Fixed 2026-07-18 \\
-4b & Level-1 + uniform 0--10 LLM maliciousness score gate (threshold $\geq7$) (current) & +28\% calls on a 40-APK benchmark, accuracy 72.5\%$\to$85\% & Adopted \\
+4b & Level-1 + uniform 0--10 LLM maliciousness score gate (threshold $\geq7$) (current) & +28\% calls on a 40-APK benchmark, accuracy 72.5\%$\to$80\% (this fix alone; row 8's fix accounts for the remaining 80\%$\to$85\%) & Adopted \\
 5 & Semantic CFG cache (cosine similarity $\geq0.88$) & $-72\%$ to $-85\%$ calls/tokens (Chapter~\ref{Chapter5}) & Adopted \\
 6 & Retrieval-augmented grounding (Jaccard similarity, no embeddings) & Increases calls rather than reducing them; more structured output & Parallel exploration, not integrated \\
 7 & Suspicious-API list extensions (\texttt{HttpClient.execute()}, library allowlist rounds, OkHttp/Kawa/Cordova signature fixes) & Fixed several false negatives/positives from missing or over-broad API coverage & Adopted (some fixes not yet merged to the live batch runs) \\
