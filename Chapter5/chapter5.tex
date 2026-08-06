@@ -21,6 +21,21 @@ alone, on a single 24-CFG APK, comparing no cache against a cold cache
 prior run on similar code). All three configurations agree on the
 MALWARE verdict.
 
+Neither configuration was billed per token: the LAMD-based candidate's
+backend is accessed through a CLI-driven subprocess under a flat-rate
+account rather than a directly billed API (Section~\ref{sec:lamd-candidate}),
+so no invoice-level dollar figure exists for these runs. The \emph{estimated}
+cost rows below apply the backend model's public list price as of this
+writing (\$5 per million input tokens, \$30 per million output tokens) to
+the token counts already reported, using the input/output split observed
+directly in this candidate's own logged runs ($\approx$70\% input,
+$\approx$30\% output) where a per-call split was not separately recorded.
+These figures answer "what would this have cost under standard API
+billing", not "what was actually paid" -- they are included because
+Chapter~\ref{Chapter3}'s RQ2 (Section~\ref{sec:rq2}) treats a per-APK dollar
+figure as central to comparing LLM-based detectors, and omitting one
+entirely would leave that comparison axis unaddressed for this candidate.
+
 \begin{table}[ht]
 \centering
 \caption{Effect of the semantic cache on the same 24-CFG APK}
@@ -32,9 +47,15 @@ MALWARE verdict.
 LLM calls        & 62      & 30 ($-52\%$)  & \textbf{9 ($-85\%$)} \\
 Total tokens      & 146{,}533 & 78{,}749 ($-46\%$) & \textbf{41{,}598 ($-72\%$)} \\
 Cache hit rate    & --      & 14/24         & \textbf{24/24} \\
+Est.\ cost (USD)$^*$ & \$1.83 & \$0.98 ($-46\%$) & \textbf{\$0.52 ($-72\%$)} \\
 Prediction        & MALWARE & MALWARE       & MALWARE \\
 \bottomrule
 \end{tabular}
+\vspace{2pt}
+\footnotesize\textit{$^*$Estimated at \$5/1M input + \$30/1M output tokens
+(backend list price at time of writing) applied to this run's total token
+count via the $\approx$70/30 input/output split observed elsewhere in this
+candidate's logs -- not an actual per-token invoice; see text above.}
 \end{table}
 
 Table~\ref{tab:paired-comparison} reports a paired baseline-vs-improved
@@ -78,5 +99,86 @@ directly answer the research questions stated in Chapter~\ref{Chapter1}.]}
 
 \section{Threats to Validity}\label{sec:threats-ch5}
 
-\textit{[TODO: Discuss limitations of the evaluation, e.g. dataset size/bias,
-LLM non-determinism, generalizability of results.]}
+\subsection{Dataset Size and Selection Bias (Primary Threat)}
+
+The 92\% figure above, like every other result in this chapter, is measured
+on the 12-APK development set described in Section~\ref{sec:lamd-candidate}:
+a small sample hand-curated at extreme VirusTotal confidence
+($\texttt{vt\_detection}\geq15$ malware, $\texttt{vt\_detection}=0$ benign)
+and balanced 7:5 malware-to-benign. This is the single most consequential
+threat to the results in this chapter, and it is not merely a theoretical
+concern -- it is directly measurable within this project. A separate,
+unfiltered random sample of 750 AndroZoo APKs (no confidence threshold, no
+class balancing, i.e.\ a realistic deployment-like distribution) was run
+through the same candidate design on a different backend configuration.
+Figure~\ref{fig:dataset-bias} reports accuracy, precision, and recall on
+both samples side by side.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=14pt,
+    width=0.85\textwidth,
+    height=6.5cm,
+    ymin=0, ymax=100,
+    ylabel={Percent (\%)},
+    symbolic x coords={Accuracy, Precision, Recall},
+    xtick=data,
+    enlarge x limits=0.25,
+    legend style={at={(0.5,-0.18)}, anchor=north, legend columns=-1},
+    nodes near coords,
+    nodes near coords align={vertical},
+    every node near coord/.append style={font=\scriptsize},
+    ymajorgrids=true,
+    grid style={dashed, gray!30},
+]
+\addplot[fill=blue!45] coordinates {(Accuracy,91.7) (Precision,100) (Recall,85.7)};
+\addplot[fill=orange!70] coordinates {(Accuracy,41.1) (Precision,10.6) (Recall,83.3)};
+\legend{Curated 12-APK set, Unfiltered 750-APK random sample}
+\end{axis}
+\end{tikzpicture}
+\caption{Detection performance on the curated 12-APK development set versus
+an unfiltered random sample of AndroZoo APKs. Recall is comparable across
+both (85.7\% vs.\ 83.3\%), but precision collapses on the unfiltered sample
+(100\% vs.\ 10.6\%), driven by a high false-positive rate on ordinary
+benign apps.}
+\label{fig:dataset-bias}
+\end{figure}
+
+Recall holds up reasonably well across both samples (85.7\% vs.\ 83.3\%),
+but precision collapses from 100\% to 10.6\% on the unfiltered sample --
+the pipeline flags a large fraction of ordinary benign apps as malware once
+it is no longer evaluated on an easy, class-balanced, high-confidence
+selection. This pattern is consistent with root-caused false positives
+traced to legitimate-but-suspicious-looking patterns (e.g.\ login flows
+that read credential fields before a network call, or reflection-based
+library internals such as OkHttp's certificate-chain cleaner) that the
+curated set's hand-picked samples do not happen to exercise. The 92\%
+headline figure in this chapter should therefore be read as an
+upper-bound, best-case result under favorable sampling conditions, not as
+a general-purpose accuracy estimate; Chapter~\ref{Chapter6} returns to this
+point when scoping the thesis's claims.
+
+\subsection{Other Threats}
+
+\textbf{LLM non-determinism.} As noted above, the one remaining miss on
+the 12-APK set (Section~\ref{sec:threats-ch5}) was traced to Tier~3
+producing different verdicts across repeated calls on byte-identical
+upstream evidence -- inherent sampling variance in the backend model
+rather than a pipeline defect. This means the reported accuracy figures
+are themselves a single draw from a distribution rather than a fully
+reproducible number; a self-consistency or majority-vote Tier~3 (calling
+the final verdict step multiple times and taking the majority) was
+discussed as a candidate mitigation but not implemented, since it would
+proportionally increase the per-APK cost figures reported in
+Section~\ref{sec:metrics}.
+
+\textbf{Cache similarity threshold.} The semantic cache's reuse threshold
+(cosine similarity $\geq0.88$, Section~\ref{sec:lamd-candidate}) was fixed
+by inspection rather than swept experimentally. No sensitivity analysis
+was run to check how cache-hit rate, cost, or downstream accuracy would
+change at a stricter or looser threshold, so the reported cost savings in
+Section~\ref{sec:metrics} should be read as specific to this one setting,
+not necessarily its optimum.
