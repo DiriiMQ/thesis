@@ -147,6 +147,8 @@ Chapter~\ref{Chapter5}.
 
 \begin{figure}[htbp]
 \centering
+% Height-capped so the diagram plus its caption fit one page.
+\adjustbox{max width=\textwidth,max totalheight=0.78\textheight}{
 \begin{tikzpicture}[
   node distance=7mm and 10mm,
   every node/.style={font=\footnotesize},
@@ -195,6 +197,7 @@ Chapter~\ref{Chapter5}.
   \draw[arr] (benign.south) .. controls +(0,-6mm) and +(-14mm,6mm) .. (final.west);
   \draw[arr] (tier23.south) .. controls +(0,-6mm) and +(14mm,6mm) .. (final.east);
 \end{tikzpicture}
+}
 \caption{End-to-end flow of the current LAMD-based candidate
 (cache-and-verified-connection design). Each sliced CFG either hits the
 semantic cache or goes through Tier~1 and FCV; once a SOURCE and a SINK item
