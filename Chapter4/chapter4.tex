@@ -145,6 +145,35 @@ It is treated as a separate, not-yet-integrated exploration of explanation
 quality rather than a candidate for the main cost/accuracy comparison in
 Chapter~\ref{Chapter5}.
 
+Table~\ref{tab:design-history} summarizes every design considered during
+this iterative process, including intermediate variants superseded before
+reaching the current design, for reference.
+
+\begin{table}[htbp]
+\centering
+\caption{Every design considered for the LAMD-based candidate, including
+superseded intermediate variants}
+\label{tab:design-history}
+\footnotesize
+\begin{tabularx}{\textwidth}{lXXl}
+\toprule
+\# & Design & Outcome & Status \\
+\midrule
+1 & Baseline (faithful reimplementation) & Control condition; every CFG pays full Tier1+FCV+Tier2+Tier3 & Kept as baseline \\
+2 & Role-based early exit (naive: any SOURCE + any SINK anywhere in the APK) & Coincidental unrelated pairs risk false positives & Superseded by connection-verification design \\
+3a & Level-2 connection: shared Dalvik registers & Meaningless across method boundaries -- registers are not shared between functions & Discarded immediately \\
+3b & Level-2 connection: same class, no LLM verification & Unsound -- caused a real false negative (unrelated methods sharing a generic utility class) & Fixed 2026-07-13 \\
+3c & Level-2 connection: same class, with LLM verification (current) & Same treatment as Level 3 & Adopted \\
+4a & Level-1 connection (same method): structurally guaranteed, no LLM verification & Still cost accuracy -- ``connected'' evidence is not necessarily malicious & Fixed 2026-07-18 \\
+4b & Level-1 + uniform 0--10 LLM maliciousness score gate (threshold $\geq7$) (current) & +28\% calls on a 40-APK benchmark, accuracy 72.5\%$\to$85\% & Adopted \\
+5 & Semantic CFG cache (cosine similarity $\geq0.88$) & $-72\%$ to $-85\%$ calls/tokens (Chapter~\ref{Chapter5}) & Adopted \\
+6 & Retrieval-augmented grounding (Jaccard similarity, no embeddings) & Increases calls rather than reducing them; more structured output & Parallel exploration, not integrated \\
+7 & Suspicious-API list extensions (\texttt{HttpClient.execute()}, library allowlist rounds, OkHttp/Kawa/Cordova signature fixes) & Fixed several false negatives/positives from missing or over-broad API coverage & Adopted (some fixes not yet merged to the live batch runs) \\
+8 & Tier-3 verdict-parsing fix (anchored \texttt{Verdict:} regex) & Fixed hedged-conclusion misparsing; 80\%$\to$85\% accuracy on the 40-APK benchmark & Adopted \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
@@ -218,7 +247,12 @@ is distinct from the original LAMD paper's own evaluation set, which spans
 across three temporally ordered test periods (2020--2023) to measure
 robustness to distribution drift~\cite{Qian2025-ua}. A larger-scale
 evaluation dataset for the final cross-candidate comparison has not yet
-been finalized.
+been finalized. Separately, an unfiltered random sample of 750 AndroZoo
+APKs (no confidence threshold, no class balancing) is being run against two
+additional self-hosted backends as an in-progress robustness check on the
+candidate's false-positive behavior outside the curated 12-APK set; this is
+exploratory and distinct from the finalized cross-candidate dataset above --
+see Section~\ref{sec:threats-ch5}.
 
 \section{Evaluation Metrics}\label{sec:metrics}
 

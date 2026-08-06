@@ -83,13 +83,19 @@ APK & Baseline calls & Improved calls & Reduction & Prediction \\
 \end{tabular}
 \end{table}
 
-Across the full 12-APK set, the improved pipeline reached the correct
-verdict on 11/12 samples (92\%) after both design fixes described in
+Across the full 12-APK set (7 malware, 5 benign), the improved pipeline
+reached the correct verdict on 11/12 samples (91.7\%, rounded to 92\%
+elsewhere in this chapter) after both design fixes described in
 Section~\ref{sec:lamd-candidate}, up from 10/12 (83\%) before those fixes.
 The one remaining miss was traced to Tier-3's verdict not being fully
 deterministic across repeated LLM calls on the same borderline evidence,
 rather than to either fixed design issue -- noted here as an open point,
-discussed further in Section~\ref{sec:threats-ch5}.
+discussed further in Section~\ref{sec:threats-ch5}. The miss is itself a
+malware sample misclassified as benign (a false negative); the other 6
+malware and all 5 benign samples are correct, giving
+$\mathrm{TP}=6,\mathrm{FN}=1,\mathrm{TN}=5,\mathrm{FP}=0$, i.e.\ Precision
+$=100\%$ and Recall $=85.7\%$ -- the figures quoted in
+Section~\ref{sec:threats-ch5}.
 
 \section{Discussion}
 
@@ -109,62 +115,82 @@ and balanced 7:5 malware-to-benign. This is the single most consequential
 threat to the results in this chapter, and it is not merely a theoretical
 concern -- it is directly measurable within this project. A separate,
 unfiltered random sample of 750 AndroZoo APKs (no confidence threshold, no
-class balancing, i.e.\ a realistic deployment-like distribution) was run
-through the same candidate design on a different backend configuration.
+class balancing, i.e.\ a realistic deployment-like distribution) is being
+run through the same candidate design on two different self-hosted LLM
+backends (``fit'', a locally hosted Qwen3.6-27B, and ``iec'', a second
+self-hosted model) -- an in-progress run, 596/750 and 215/750 complete
+respectively at time of writing, and the \texttt{fit} figures additionally
+mix results from before and after a mid-run dataset rebalance (see caption).
 Figure~\ref{fig:dataset-bias} reports accuracy, precision, and recall on
-both samples side by side.
+all three.
 
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
     ybar,
-    bar width=14pt,
-    width=0.85\textwidth,
+    bar width=10pt,
+    width=0.9\textwidth,
     height=6.5cm,
-    ymin=0, ymax=100,
+    ymin=0, ymax=105,
     ylabel={Percent (\%)},
     symbolic x coords={Accuracy, Precision, Recall},
     xtick=data,
-    enlarge x limits=0.25,
-    legend style={at={(0.5,-0.18)}, anchor=north, legend columns=-1},
+    enlarge x limits=0.2,
+    legend style={at={(0.5,-0.2)}, anchor=north, legend columns=-1},
     nodes near coords,
     nodes near coords align={vertical},
-    every node near coord/.append style={font=\scriptsize},
+    every node near coord/.append style={font=\tiny},
     ymajorgrids=true,
     grid style={dashed, gray!30},
 ]
 \addplot[fill=blue!45] coordinates {(Accuracy,91.7) (Precision,100) (Recall,85.7)};
-\addplot[fill=orange!70] coordinates {(Accuracy,41.1) (Precision,10.6) (Recall,83.3)};
-\legend{Curated 12-APK set, Unfiltered 750-APK random sample}
+\addplot[fill=orange!70] coordinates {(Accuracy,60.7) (Precision,60.3) (Recall,83.5)};
+\addplot[fill=teal!55] coordinates {(Accuracy,86.2) (Precision,92.9) (Recall,91.4)};
+\legend{Curated 12-APK (Codex/gpt-5.5), Random 750 -- fit/Qwen (n=529), Random 750 -- iec (n=210)}
 \end{axis}
 \end{tikzpicture}
 \caption{Detection performance on the curated 12-APK development set versus
-an unfiltered random sample of AndroZoo APKs. Recall is comparable across
-both (85.7\% vs.\ 83.3\%), but precision collapses on the unfiltered sample
-(100\% vs.\ 10.6\%), driven by a high false-positive rate on ordinary
-benign apps.}
+an in-progress, unfiltered random sample of 750 AndroZoo APKs run on two
+different backends. Figures for the random sample reflect partial progress
+at the time of writing (596/750 fit, 215/750 iec) and will change as the
+run completes; the \texttt{fit} column additionally mixes results from
+before and after a mid-run dataset rebalance (25\% of the 750 pool was
+swapped to reach a 50:50 malware:benign split partway through), so it
+should be read as directional, not final. Recomputed via
+\texttt{results/compute\_accuracy.py} against ground truth reconstructed
+from the original AndroZoo VirusTotal metadata.}
 \label{fig:dataset-bias}
 \end{figure}
 
-Recall holds up reasonably well across both samples (85.7\% vs.\ 83.3\%),
-but precision collapses from 100\% to 10.6\% on the unfiltered sample --
-the pipeline flags a large fraction of ordinary benign apps as malware once
-it is no longer evaluated on an easy, class-balanced, high-confidence
-selection. This pattern is consistent with root-caused false positives
-traced to legitimate-but-suspicious-looking patterns (e.g.\ login flows
-that read credential fields before a network call, or reflection-based
-library internals such as OkHttp's certificate-chain cleaner) that the
-curated set's hand-picked samples do not happen to exercise. The 92\%
-headline figure in this chapter should therefore be read as an
-upper-bound, best-case result under favorable sampling conditions, not as
-a general-purpose accuracy estimate; Chapter~\ref{Chapter6} returns to this
-point when scoping the thesis's claims.
+Recall holds up across all three (83.5--91.4\%), so the pipeline is not
+missing more real malware on the unfiltered sample. Precision, however,
+diverges sharply by \emph{backend}: on \texttt{iec} it stays close to the
+curated set (92.9\% vs.\ 100\%), while on \texttt{fit} it collapses to
+60.3\%. Since the curated 12-APK figures were themselves produced on a
+third backend (Codex CLI/gpt-5.5, Section~\ref{sec:lamd-candidate}), this
+comparison cannot cleanly separate a ``dataset difficulty'' effect from a
+``backend'' effect -- both vary at once between the curated and random
+runs, and the \texttt{fit} vs.\ \texttt{iec} gap on the \emph{same}
+unfiltered sample shows the backend effect alone is already large. What
+can be said without that confound: the pipeline's false-positive behavior
+is not a fixed property of the design, and evaluating it on one
+easy, class-balanced, high-confidence, single-backend sample --
+as the 92\% headline figure in this chapter does -- is not sufficient to
+characterize it. Root-caused false positives on the \texttt{fit} run trace
+to legitimate-but-suspicious-looking patterns (e.g.\ login flows that read
+credential fields before a network call, or reflection-based library
+internals such as OkHttp's certificate-chain cleaner) that the curated
+set's hand-picked samples do not happen to exercise. The 92\% headline
+figure should therefore be read as an upper-bound, best-case result under
+favorable sampling \emph{and} backend conditions, not as a general-purpose
+accuracy estimate; Chapter~\ref{Chapter6} returns to this point when
+scoping the thesis's claims.
 
 \subsection{Other Threats}
 
 \textbf{LLM non-determinism.} As noted above, the one remaining miss on
-the 12-APK set (Section~\ref{sec:threats-ch5}) was traced to Tier~3
+the 12-APK set was traced to Tier~3
 producing different verdicts across repeated calls on byte-identical
 upstream evidence -- inherent sampling variance in the backend model
 rather than a pipeline defect. This means the reported accuracy figures
