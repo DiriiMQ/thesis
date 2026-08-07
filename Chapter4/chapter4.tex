@@ -26,13 +26,19 @@ far and states explicitly where a candidate is still pending.
 
 \section{Candidate Methods}
 
-\textit{[TODO: Introduce the full set of candidate methods evaluated in this
-thesis and how each was integrated into a common evaluation pipeline. One
-candidate builds directly on the LAMD framework~\cite{Qian2025-ua}; its
-development is detailed in Section~\ref{sec:lamd-candidate} below. Other
-candidates (e.g. representative RAG- or fine-tuning-based systems from the
-Chapter~\ref{Chapter3} taxonomy) should be described in their own subsections
-here.]}
+As of this writing, this thesis's candidate set has one member: a
+Semantic-Representation-family method built on the LAMD
+framework~\cite{Qian2025-ua}, developed and iteratively hardened as
+described in Section~\ref{sec:lamd-candidate} below. Additional candidates
+representative of the other two families identified in
+Chapter~\ref{Chapter3}'s taxonomy (RQ1, Section~\ref{sec:rq1}) --
+Retrieval-Augmented Generation and Fine-tuning/Direct Classification --
+are planned but not yet implemented, and are not described here since
+doing so would mean detailing an architecture and evaluation that does
+not yet exist. A prompt-grounding technique layered on top of the
+LAMD-based candidate itself was also explored and is reported in
+Section~\ref{sec:lamd-candidate}, but it is not a second, independently
+evaluated candidate (Chapter~\ref{Chapter6}, Limitations).
 
 \subsection{Development of the LAMD-based Candidate}\label{sec:lamd-candidate}
 
