@@ -7,7 +7,14 @@ This thesis evaluates LLM-based Android malware detection methods under a
 common framework: the same dataset(s), the same metrics
 (Section~\ref{sec:metrics}), and a comparable evaluation protocol across
 candidates, so that differences in reported performance reflect the method
-rather than the evaluation setup. As of this writing, one candidate has a
+rather than the evaluation setup. Detection quality and cost-efficiency are
+treated as co-equal evaluation axes throughout, not a primary metric with
+cost as an afterthought: Chapter~\ref{Chapter3}'s RQ2
+(Section~\ref{sec:rq2}) already shows that every reviewed LLM-based
+detector trades accuracy against non-trivial per-APK inference cost, so a
+candidate's cost profile is reported with the same rigor as its detection
+metrics rather than left as a secondary note. As of this writing, one
+candidate has a
 working implementation: the LAMD-based method described in
 Section~\ref{sec:lamd-candidate}, built on the LAMD framework introduced in
 Chapter~\ref{Chapter2}. Additional candidates, drawn from the taxonomy of

@@ -10,7 +10,12 @@ metrics defined in Section~\ref{sec:metrics}.]}
 The results below are an internal ablation of the LAMD-based candidate
 only (baseline reimplementation vs.\ its own optimized versions,
 Section~\ref{sec:lamd-candidate}), not yet a comparison against other
-candidate methods. They were reconstructed from development logs and prior
+candidate methods. Per the cost-efficiency framing set out in
+Chapter~\ref{Chapter4}, this ablation is primarily a cost-efficiency
+study: each design change is evaluated first by how much it reduces LLM
+calls, tokens, and estimated cost, with the verdict held constant across
+configurations as a correctness safety check rather than the primary
+measurement. They were reconstructed from development logs and prior
 analysis sessions rather than freshly re-run for this write-up; the exact
 figures should be treated as best-available and re-verified before being
 cited as final thesis results.
