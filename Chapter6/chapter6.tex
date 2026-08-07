@@ -3,21 +3,149 @@
 
 \section{Summary}
 
-\textit{[TODO: Restate the objectives and methodology briefly, and summarize
-the key results obtained.]}
+This thesis set out to evaluate LLM-based Android malware detection under a
+common framework, treating detection quality and cost-efficiency as
+co-equal evaluation axes rather than reporting cost as an afterthought to
+accuracy (Chapter~\ref{Chapter4}). The first phase was a Systematic
+Literature Review of six primary studies (Chapter~\ref{Chapter3}), which
+mapped the field into three recurring strategies (Retrieval-Augmented
+Generation, Semantic Representation, and Fine-tuning/Direct
+Classification), synthesized their reported effectiveness and cost
+profiles without over-claiming direct numerical comparability, and
+identified concrete gaps: inconsistent cost reporting, a shared reliance
+on static analysis alone, and reliability limits from hallucination and
+prompt sensitivity. The second phase built and iteratively hardened one
+concrete candidate on top of the LAMD framework (Chapter~\ref{Chapter4}),
+progressing from a faithful baseline reimplementation through role-based
+early exit, a semantic cache, and multi-level SOURCE/SINK connection
+verification, with each optimization's own accuracy risk found and fixed
+before being accepted (Table~\ref{tab:design-history}). The measured
+results (Chapter~\ref{Chapter5}) show the two cost-reduction mechanisms
+working as designed -- up to 85\% fewer LLM calls and 72\% fewer tokens
+from the cache alone, 51--97\% fewer calls from connection-verified early
+exit -- without changing the verdict on the cases tested, and 11/12 (92\%)
+correct on the curated development set. The same results also show this
+headline figure does not generalize on its own: on an unfiltered random
+sample, precision held near the curated figure on one backend (92.9\%,
+\texttt{iec}) but collapsed on another (60.3\%, \texttt{fit}/Qwen), showing
+that the accuracy story is backend-dependent as much as it is
+dataset-dependent.
 
 \section{Contributions and Significance}
 
-\textit{[TODO: Explain the scientific and practical significance of the
-results -- what this evaluation tells the community about the readiness of
-LLM-based methods for Android malware detection.]}
+This thesis's contributions are scoped honestly to what was actually built,
+not to the fuller cross-candidate comparison originally targeted
+(Chapter~\ref{Chapter4}). As of this writing, one
+candidate has a working, measured implementation; the significance below
+follows from that one candidate, not from a comparison across methods.
 
-\section{Limitations}
+\textbf{A measured, not asserted, cost-efficiency result.} The literature
+surveyed in Chapter~\ref{Chapter3} identifies cost as a persistent, poorly
+standardized concern across LLM-based detectors (RQ2, RQ3) but rarely
+isolates which specific design choice buys which specific saving. This
+thesis contributes a design history (Table~\ref{tab:design-history}) that
+attributes each cost reduction to a specific, independently-tested
+mechanism -- caching versus connection-verified early exit -- with paired
+before/after numbers for each, rather than a single aggregate saving
+figure whose source is hard to attribute.
 
-\textit{[TODO: State the limitations/scope boundaries of the thesis.]}
+\textbf{Evidence that cost-saving and correctness-preserving are separate
+engineering problems.} The same design history shows, with dated,
+root-caused examples, that a cost-reduction mechanism which appears to
+work (naive early exit; same-class connection without verification) can
+silently change a verdict, and that closing each gap was a distinct
+engineering step, not a byproduct of the original optimization. This is a
+concrete, reproducible instance of a pattern the surveyed literature
+discusses more abstractly (Chapter~\ref{Chapter3}, RQ3's discussion of
+verification mechanisms being themselves susceptible to error).
+
+\textbf{Empirical confirmation, on a fresh sample, of two gaps the SLR
+identified from the literature alone.} The unfiltered 750-APK comparison
+(Section~\ref{sec:threats-ch5}) is independent evidence -- not a citation
+of prior work -- for two claims Chapter~\ref{Chapter3} makes from reading
+other papers: that reliance on static analysis alone leaves a persistent
+blind spot (confirmed here by a real missed detection carried entirely in
+a native \texttt{.so} library, Chapter~\ref{Chapter5}), and that
+verification mechanisms do not catch every reliability failure (confirmed
+here by false positives that are structurally accurate but semantically
+misjudged, evading LAMD's own Factual Consistency Verification).
+
+\textbf{A reusable evaluation framework.} Independent of any single
+candidate's results, Chapter~\ref{Chapter4}'s dataset, metric, and
+protocol definitions are built to accept additional candidates from the
+Chapter~\ref{Chapter3} taxonomy without redefinition, which is the
+practical prerequisite for the cross-candidate comparison this thesis did
+not have time to complete.
+
+\section{Limitations}\label{sec:limitations-ch6}
+
+The measurement-level limitations of the results already reported --
+sample size, LLM non-determinism, an unswept cache threshold -- are
+discussed in Section~\ref{sec:threats-ch5} and are not repeated here. This
+section instead states the boundaries of what the thesis attempted at
+all.
+
+\textbf{Scope: one candidate, not a comparison.} The thesis's own stated
+goal (Chapter~\ref{Chapter4}) was a common framework for comparing
+multiple LLM-based candidates. Only one candidate reached a working,
+measured implementation. Every accuracy, cost, and reliability finding in
+this thesis is therefore a finding about the LAMD-based design
+specifically, not a general claim about LLM-based Android malware
+detection as a class.
+
+\textbf{The 750-APK evaluation is unfinished.} The random-sample
+comparison central to Chapter~\ref{Chapter5}'s Discussion and Threats to
+Validity was, at the time of writing, an in-progress run (596/750 and
+215/750 complete on the two backends), and the \texttt{fit} backend's
+figures mix pre- and post-rebalance results from a dataset composition
+change made partway through. The directional finding -- precision is
+backend-dependent -- is unlikely to reverse, but the exact percentages
+reported are not final numbers.
+
+\textbf{The RAG-grounding exploration is not a second candidate.} A
+retrieval-augmented prompt-grounding technique was implemented and tested
+on top of the LAMD-based candidate (Chapter~\ref{Chapter4}), but it was
+never evaluated under the common framework's accuracy/cost metrics on more
+than a single APK, and it reuses the LAMD-based candidate's own pipeline
+rather than constituting an independent detection architecture. It is
+reported as an internal exploration, not as evidence toward a second,
+independently-evaluated candidate.
 
 \section{Future Work}
 
-\textit{[TODO: Propose directions to address the limitations above, e.g.
-larger-scale datasets, additional candidate methods, or further integration
-with the LAMD framework.]}
+\textbf{Complete the in-progress 750-APK evaluation.} The clearest
+near-term action is finishing the random-sample run on both backends and
+recomputing Section~\ref{sec:threats-ch5}'s figures on the full,
+post-rebalance 750 APKs, since the current numbers are explicitly
+provisional.
+
+\textbf{Address Tier-3 non-determinism.} A self-consistency or
+majority-vote Tier-3 (issuing the final-verdict call multiple times and
+taking the majority) was discussed as a candidate fix during development
+(Section~\ref{sec:threats-ch5}) but not implemented, since it
+proportionally increases per-APK cost -- itself a concrete instance of the
+cost/reliability trade-off this thesis's cost-efficiency framing puts
+front and center, and a natural next design-history entry to measure
+rather than assume.
+
+\textbf{Sweep the cache similarity threshold.} The $\geq 0.88$ cosine
+threshold was fixed by inspection; a systematic sweep would show whether
+cache-hit rate, cost, and downstream accuracy trade off favorably at other
+settings, closing the gap noted in Section~\ref{sec:threats-ch5}.
+
+\textbf{Implement additional candidates to complete the cross-candidate
+comparison.} This is the most direct way to close the scope gap in
+Section~\ref{sec:limitations-ch6} above: at least one RAG-based and one
+fine-tuning-based candidate, representative of the two families identified
+in Chapter~\ref{Chapter3}'s taxonomy (RQ1) but not yet implemented here,
+would let Chapter~\ref{Chapter4}'s evaluation framework fulfill its
+original purpose.
+
+\textbf{Evaluate a cascaded triage architecture.} Chapter~\ref{Chapter5}'s
+Discussion motivates this concretely, not abstractly: the false-positive
+pattern observed on the \texttt{fit} backend (ordinary login flows,
+common bundled-library reflection patterns) is the kind of case a
+lightweight pre-filter could plausibly screen out before full LLM
+reasoning is invoked, in the spirit of Chapter~\ref{Chapter3}'s RQ4
+recommendation, and this thesis's own false-positive data is a ready-made
+test set for that idea.
