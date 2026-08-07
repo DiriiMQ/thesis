@@ -99,9 +99,100 @@ Section~\ref{sec:threats-ch5}.
 
 \section{Discussion}
 
-\textit{[TODO: Interpret the results. Compare against the related work
-reviewed in Chapter~\ref{Chapter2}. Explain any surprising findings, and
-directly answer the research questions stated in Chapter~\ref{Chapter1}.]}
+The cost reduction reported in Section~\ref{sec:threats-ch5} and above rests
+on two concrete mechanisms, not a general claim of efficiency. The semantic
+cache alone cuts LLM calls from 62 to 9 (\,$-85\%$) and tokens from 146,533
+to 41,598 (\,$-72\%$) on a single warm-cache run (Table~\ref{tab:cache-ablation}).
+Role-based early exit combined with connection verification cuts calls by
+51--97\% across the six paired malware APKs in
+Table~\ref{tab:paired-comparison}, by skipping Tier~2 and Tier~3 once the
+evidence for a verdict is already strong enough. Both mechanisms are
+measured, not estimated.
+
+What the ablation tables do not show is that each of these savings was
+earned by first finding, and then closing, an accuracy risk the savings
+mechanism itself introduced. The naive version of role-based early exit
+(any SOURCE label and any SINK label anywhere in the APK) risked a false
+positive from two unrelated suspicious-looking functions, which motivated
+the connection-verification design in the first place. That design was
+itself unsound at first: treating same-class co-location as conclusive
+evidence without an LLM verification step caused a real false negative on
+sample \texttt{05B7569D...}, where an unrelated same-class pair inside a
+generic utility class triggered an early, incorrect benign verdict before
+the scan reached the application's actual malicious evidence
+(Table~\ref{tab:design-history}, row 3b). A second, independent gap --
+a missing HTTP-client transmission API in the suspicious-API list -- caused
+a downloader-style sample (\texttt{032EF910...}) to be under-evidenced and
+misclassified (row 7). Both gaps were closed, and the 12-APK accuracy moved
+from 10/12 to 11/12 as a direct, measured result. The one remaining miss is
+not a design flaw in this sense: it traces to Tier-3 verdict
+non-determinism on a borderline case, which no fix applied so far
+addresses (Section~\ref{sec:threats-ch5}). Reducing cost while holding
+correctness constant is, in other words, the easy part to demonstrate; the
+harder and more time-consuming part of this work was locating and fixing
+the specific ways each cost-saving shortcut could silently change a
+verdict.
+
+The 750-APK comparison in Section~\ref{sec:threats-ch5} adds a dimension
+the 12-APK ablation cannot show on its own: precision on an unfiltered
+sample depends heavily on \emph{which} backend model is used, not only on
+the pipeline design. Precision was 100\% on the curated set, 92.9\% on the
+\texttt{iec} backend, and 60.3\% on the \texttt{fit}
+(Qwen3.6-27B) backend, on the same pipeline and largely the same input
+distribution. Section~\ref{sec:lamd-candidate} already substitutes a
+locally hosted backend for the original paper's billed API, in the same
+spirit as the original paper's own suggestion that cheaper or
+locally-hosted models are a natural way to reduce deployment cost. The
+\texttt{fit} result shows that this substitution is not free: moving to a
+smaller or cheaper model can cost far more precision than moving to
+another model of similar size and hosting arrangement (\texttt{iec}), so
+cost-driven backend choices need to be evaluated on their own terms rather
+than assumed safe by analogy to cost-driven pipeline optimizations like
+caching.
+
+These findings also dialogue directly with the literature surveyed in
+Chapter~\ref{Chapter3}. RQ3 (Section~\ref{sec:rq3}) already identifies
+hallucination and prompt sensitivity as a fundamental reliability threat
+across every reviewed LLM-based detector, and notes that verification
+mechanisms such as LAMD's own Factual Consistency Verification ``preserve
+LLM interpretability but... may themselves be susceptible to LLM errors in
+the verification step.'' The root-caused false positives on the
+\texttt{fit} run are direct evidence for exactly this limitation: FCV
+correctly verifies that a Tier-1 function summary is \emph{structurally}
+consistent with its CFG, but it has no mechanism to catch a case where the
+summary is structurally accurate and still \emph{semantically}
+misjudged -- for example, a login flow that reads credential fields before
+an ordinary network call, or OkHttp's internal certificate-chain-cleaner
+reflection pattern, both read correctly by the model and both still
+escalated toward a MALWARE verdict. This is a narrower failure mode than
+the hallucination RQ3 describes in general terms: the model is not
+inventing evidence that is not there, it is misjudging the intent behind
+evidence that is genuinely present and genuinely rare-looking but
+ultimately benign. On the false-negative side, the architectural gap RQ1
+(Section~\ref{sec:rq1}) identifies across all six surveyed systems --
+``all six systems rely predominantly on static analysis... leaving
+dynamically loaded and reflectively invoked code as a persistent open
+challenge'' -- is directly confirmed by a missed malware sample
+(\texttt{com.ekx.yjuraj}, VirusTotal detection count 30) whose payload was
+carried entirely in a native \texttt{.so} library that
+\texttt{key\_context.py}'s DEX-only extraction never inspects; VirusTotal's
+engines caught it because several of them scan native binaries directly, a
+detection surface this candidate's architecture does not cover at all.
+
+Taken together, these findings point toward a specific, actionable
+recommendation rather than a general call for ``more robustness.'' RQ4
+(Section~\ref{sec:rq4}) already proposes cascaded architectures for
+scalable deployment: a lightweight classifier triages the bulk of
+incoming APKs, and full LLM reasoning is reserved for cases the classifier
+is not confident about. The \texttt{fit}-backend false-positive pattern
+observed here is exactly the kind of case such a triage layer could
+plausibly catch cheaply -- ordinary login flows and common bundled-library
+reflection patterns are the sort of thing a lightweight classifier trained
+on legitimate app behavior should recognize as unremarkable, without
+needing full LLM reasoning to reach that conclusion. This is not a
+speculative suggestion drawn from the literature in the abstract; it
+follows from the specific false-positive patterns this candidate
+demonstrably produces on the one backend where precision collapses.
 
 \section{Threats to Validity}\label{sec:threats-ch5}
 
